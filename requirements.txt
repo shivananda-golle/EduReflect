@@ -1,0 +1,32 @@
+fastapi
+uvicorn
+requests
+python-dotenv
+streamlit
+nltk
+beautifulsoup4
+fpdf
+sqlalchemy
+sentence-transformers
+faiss-cpu
+numpy
+pydantic
+python-jose[cryptography]  # For JWT tokens
+passlib[bcrypt]           # For password hashing
+python-multipart          # For form data
+
+PyPDF2==3.0.1
+python-docx==1.1.0
+fpdf==1.7.2
+bcrypt==4.0.1
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.6
+
+
+alembic==1.12.1
+reportlab==4.0.7
+APScheduler==3.10.4
+
+
+APScheduler>=3.10.0

@@ -1,0 +1,52 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Env / secrets
+.env
+.env.*
+*.env
+
+# Local DB / state
+*.db
+*.sqlite
+*.sqlite3
+
+# Project local state
+edureflect.db
+
+# Streamlit
+.streamlit/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Local git backups created during cleanup
+.git_backup_*/
+
+# Data artifacts (often large; adjust if you want to version datasets)
+data/raw_pdfs/
+
+# Do not publish local corpora / indexes
+data/
+
+# Ad-hoc local test/scratch files
+test*.py
+send_test_quiz.py
+zzzzz.txt
+
+# Binary docs
+*.pdf
+
