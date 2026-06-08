@@ -16,6 +16,7 @@ ENV/
 .env
 .env.*
 *.env
+!.env.example
 
 # Local DB / state
 *.db
