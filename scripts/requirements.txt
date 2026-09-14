@@ -1,0 +1,3 @@
+# Extra packages for the knowledge-base preparation scripts (not needed to run the app)
+pdfplumber
+wikipedia

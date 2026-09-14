@@ -1,54 +1,45 @@
 # EduReflect
 
-An AI-powered educational learning assistant built as an MVP. EduReflect helps students learn, revise, and self-assess by combining a Retrieval-Augmented Generation (RAG) Q&A pipeline, document understanding (PDF/DOCX), chat-based study sessions, and automated weekly quiz emails.
+An AI-powered study assistant. EduReflect answers students' questions from a curated science and maths knowledge base using Retrieval-Augmented Generation (RAG), turns conversations into quizzes, tracks concept mastery, and answers questions about uploaded PDFs and DOCX files.
 
-> **Stack:** FastAPI · Streamlit · SQLAlchemy + Alembic · FAISS + Sentence-Transformers · Hugging Face Inference Router · APScheduler
+> **Stack:** FastAPI · Streamlit · SQLAlchemy · FAISS + Sentence-Transformers (`intfloat/e5-base`) · Groq (OpenAI-compatible LLM API) · APScheduler
+
+**Live demo:** _coming soon_
 
 ---
 
 ## Features
 
-- **Conversational learning** — multi-turn chats grouped into projects, with editable messages and full edit history.
-- **Grounded answers** — answers are generated against a local FAISS knowledge base (E5 embeddings) so responses cite the evidence used.
-- **Configurable response style** — pick format (brief / bullets / presentation), depth (kid / standard / exam), and length (short / medium / long).
-- **Document Q&A** — upload a PDF or DOCX and ask questions directly about its contents.
-- **Weekly quiz emails** — APScheduler job auto-generates a personalised quiz each Sunday from the user's recent learning and emails a unique quiz link.
-- **Quiz tracking** — quizzes are scored, time-tracked, and stored as attempts for progress analytics.
-- **Auth & subscriptions** — JWT-based login/signup with bcrypt hashing and free / basic / premium tiers with monthly chat limits.
-- **PDF export** — export chats as a styled PDF from the Streamlit UI (ReportLab).
+- **Grounded answers (RAG)**: questions are embedded with E5, matched against a FAISS index of 2,316 passages, and answered by an LLM using only the retrieved evidence, which is shown alongside the answer.
+- **Configurable response style**: format (brief / bullets / presentation), depth (kid / standard / exam), and length (short / medium / long), plus optional diagnostic questions.
+- **Quizzes and mastery tracking**: generate a 5-question multiple-choice quiz from any answer; results update per-concept mastery levels.
+- **Document Q&A**: upload a PDF or DOCX, get a summary, and ask questions about it.
+- **Study workspace**: multi-turn chats grouped into projects, pinning, search, message editing with history, chat summaries, and PDF export.
+- **Weekly quiz emails** (optional): a scheduled job builds a personalised quiz from each user's recent chats and emails a link.
+- **Runs entirely on free tiers**: a global daily LLM budget, per-user daily limits, and sign-up throttling keep a public demo within free quotas.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────┐        ┌──────────────────────┐
-│  Streamlit frontend │ ─────► │   FastAPI backend    │
-│  (frontend/         │  HTTP  │   (app/main.py)      │
-│   streamlit_app.py) │        │                      │
-└─────────────────────┘        │  ┌────────────────┐  │
-                               │  │ auth_routes    │  │
-                               │  │ chat_routes    │  │
-                               │  │ routes (quiz)  │  │
-                               │  └────────────────┘  │
-                               │           │          │
-                               │  ┌────────▼───────┐  │
-                               │  │   services/    │  │
-                               │  │  generator,    │  │
-                               │  │  kb_retriever, │  │
-                               │  │  question_gen, │  │
-                               │  │  email_service │  │
-                               │  └────────┬───────┘  │
-                               └───────────┼──────────┘
-                                           │
-                ┌──────────────────────────┼──────────────────────────┐
-                ▼                          ▼                          ▼
-        ┌──────────────┐         ┌──────────────────┐       ┌──────────────────┐
-        │  SQLite DB   │         │  FAISS index +   │       │  Hugging Face    │
-        │ (edureflect  │         │   metadata.json  │       │  Router API      │
-        │    .db)      │         │  (data/index/)   │       │  (LLM)           │
-        └──────────────┘         └──────────────────┘       └──────────────────┘
+┌──────────────────────┐   HTTP (server-side)   ┌──────────────────────────────┐
+│  Streamlit frontend  │ ─────────────────────► │       FastAPI backend        │
+│ frontend/            │  forwards visitor IP   │       app/main.py            │
+│   streamlit_app.py   │                        │  auth · chats · quiz routes  │
+└──────────────────────┘                        └──────────────┬───────────────┘
+                                                               │
+                         ┌─────────────────────────────────────┼─────────────────────────────┐
+                         ▼                                     ▼                             ▼
+               ┌───────────────────┐             ┌───────────────────────┐     ┌───────────────────────┐
+               │  SQLite database  │             │  kb_retriever         │     │  llm_client           │
+               │  users, chats,    │             │  E5 embeddings +      │     │  Groq free tier       │
+               │  quizzes, usage   │             │  FAISS (data/index/)  │     │  daily budget +       │
+               │  counters         │             │                       │     │  model fallback       │
+               └───────────────────┘             └───────────────────────┘     └───────────────────────┘
 ```
+
+**Request flow for a question:** retrieve the top 5 passages from FAISS → build a grounded prompt (style, depth, length) → one LLM call through `llm_client` → store the answer and its evidence in the chat.
 
 ---
 
@@ -57,38 +48,34 @@ An AI-powered educational learning assistant built as an MVP. EduReflect helps s
 ```
 .
 ├── app/
-│   ├── main.py                  # FastAPI entrypoint
-│   ├── scheduler.py             # APScheduler: weekly quiz job (Sun 9 AM)
+│   ├── main.py                    # FastAPI app, startup table creation, limit error handler
+│   ├── scheduler.py               # APScheduler: weekly quiz emails (Sun 09:00)
 │   ├── api/
-│   │   ├── auth_routes.py       # signup / login / JWT
-│   │   ├── chat_routes.py       # projects, chats, messages, documents
-│   │   └── routes.py            # /ask, weekly-quiz endpoints
+│   │   ├── auth_routes.py         # register / login / JWT / usage status
+│   │   ├── chat_routes.py         # projects, chats, messages, documents, quizzes
+│   │   └── routes.py              # /ask, weekly quizzes, admin email triggers
 │   ├── database/
-│   │   └── models.py            # SQLAlchemy models + JWT helpers
+│   │   └── models.py              # SQLAlchemy models + JWT helpers
 │   ├── services/
-│   │   ├── generator.py         # LLM call (HF Router)
-│   │   ├── kb_builder.py        # build FAISS index from data/clean/
-│   │   ├── kb_retriever.py      # query FAISS index
-│   │   ├── question_generator.py
+│   │   ├── llm_client.py          # single entry point for LLM calls
+│   │   ├── usage_limits.py        # daily budgets, per-user and sign-up limits
+│   │   ├── kb_builder.py          # build the FAISS index from data/clean/
+│   │   ├── kb_retriever.py        # query the FAISS index
+│   │   ├── generator.py           # grounded answer prompt
+│   │   ├── question_generator.py  # quiz generation (JSON)
+│   │   ├── summarizer.py          # chat summaries
+│   │   ├── document_processor.py  # PDF/DOCX extraction + Q&A
+│   │   ├── concept_tracker.py     # mastery tracking
 │   │   ├── weekly_quiz_scheduler.py
-│   │   ├── email_service.py     # SMTP sender
-│   │   ├── document_processor.py
-│   │   ├── summarizer.py
-│   │   ├── refiner.py
-│   │   ├── verifier.py
-│   │   └── concept_tracker.py
+│   │   └── email_service.py       # SMTP sender
 │   └── utils/
-│       ├── config.py            # env-driven LLM config
-│       └── email_config.py      # SMTP config
-├── alembic/                     # DB migrations
+│       ├── config.py              # environment-driven settings
+│       └── email_config.py        # SMTP settings
 ├── frontend/
-│   └── streamlit_app.py         # Streamlit UI
-├── scripts/
-│   ├── wiki_collector.py        # ingest Wikipedia content
-│   ├── pdf_to_text.py           # PDF → text
-│   └── clean_text.py            # cleanup helper
+│   └── streamlit_app.py           # Streamlit UI
+├── scripts/                       # knowledge-base preparation (PDF → text, Wikipedia, cleaning)
+├── alembic/                       # historical migrations (tables are created on startup)
 ├── requirements.txt
-├── alembic.ini
 └── .env.example
 ```
 
@@ -96,105 +83,111 @@ An AI-powered educational learning assistant built as an MVP. EduReflect helps s
 
 ## Quick start
 
-### 1. Clone and create a virtual environment
+### 1. Clone and create a virtual environment (Python 3.12)
 
 ```bash
 git clone https://github.com/shivananda-golle/EduReflect.git
 cd EduReflect
 python -m venv .venv
 
+# macOS / Linux / WSL
+source .venv/bin/activate
 # Windows (PowerShell)
 .\.venv\Scripts\Activate.ps1
-
-# macOS / Linux
-source .venv/bin/activate
 ```
 
 ### 2. Install dependencies
 
 ```bash
+# Optional but recommended without a GPU: the CPU build of PyTorch is ~10x smaller
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+
 pip install -r requirements.txt
 ```
 
-> First-time runs of any RAG endpoint will download the `intfloat/e5-base` sentence-transformer model (~430 MB). This can take a few minutes.
+The first question downloads the `intfloat/e5-base` embedding model (~440 MB).
 
 ### 3. Configure environment
-
-Copy the example file and fill in the values:
 
 ```bash
 cp .env.example .env
 ```
 
-Required for LLM responses:
+| Needed for | Variables |
+| --- | --- |
+| LLM answers (required) | `GROQ_API_KEY`: free, no credit card, from <https://console.groq.com/keys> |
+| Stable logins (recommended) | `SECRET_KEY`: generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| Weekly quiz emails (optional) | `SMTP_USERNAME`, `SMTP_PASSWORD`, `SENDER_EMAIL`, `ADMIN_API_KEY` |
 
-- `HF_API_TOKEN` — get one from <https://huggingface.co/settings/tokens>
+### 4. Add a knowledge base
 
-Required for weekly quiz emails:
+The app answers from `data/index/faiss.index` and `data/index/metadata.json`. The `data/` folder is not committed; see [Knowledge base](#knowledge-base) to build one.
 
-- `SMTP_USERNAME`, `SMTP_PASSWORD`, `SENDER_EMAIL` — for Gmail, generate an [App Password](https://support.google.com/accounts/answer/185833) and use it as `SMTP_PASSWORD`.
-
-### 4. Initialise the database
-
-```bash
-alembic upgrade head
-```
-
-(If you don't have any migrations to apply, the tables will also be created on first API call via `Base.metadata.create_all`.)
-
-### 5. Run the backend
+### 5. Run
 
 ```bash
-python -m uvicorn app.main:app --reload
-```
+# Terminal 1: backend (tables are created automatically on startup)
+python -m uvicorn app.main:app --port 8000
 
-Backend: <http://127.0.0.1:8000> · Interactive docs: <http://127.0.0.1:8000/docs>
-
-### 6. Run the frontend
-
-In a new terminal (with the venv activated):
-
-```bash
+# Terminal 2: frontend
 streamlit run frontend/streamlit_app.py
 ```
 
-Frontend: <http://127.0.0.1:8501>
+- Frontend: <http://localhost:8501>
+- API docs (Swagger): <http://localhost:8000/docs>
 
 ---
 
-## Optional: build the local knowledge base
+## Knowledge base
 
-The `/ask` endpoint uses a FAISS index built from cleaned text files. To build one:
+The reference index contains **2,316 passages**:
 
-1. Drop `.txt` files into `data/clean/` (you can use the helpers in `scripts/` to convert PDFs or pull from Wikipedia).
-2. Run:
+- **1,207** from NCERT Class 9 Mathematics and Science textbooks
+- **1,109** from Wikipedia articles on core science topics (physics, chemistry, biology, energy, forces, and more)
 
-   ```bash
-   python -m app.services.kb_builder
-   ```
+To build your own:
 
-This writes `data/index/faiss.index` and `data/index/metadata.json`. The `data/` directory is gitignored by design — knowledge bases are local-only.
+```bash
+pip install -r scripts/requirements.txt
+python scripts/pdf_to_text.py        # data/raw_pdfs/*.pdf → data/raw/textbooks/
+python scripts/wiki_collector.py     # Wikipedia topics → data/raw/wikipedia/
+python scripts/clean_text.py         # data/raw/ → data/clean/
+python -m app.services.kb_builder    # data/clean/ → data/index/
+```
+
+Passages are ~120-word chunks; tiny or symbol-heavy chunks are filtered out.
 
 ---
 
-## Optional: schedule weekly quiz emails
+## Free-tier protection
 
-The scheduler is a separate process so you can run the API stateless. Start it with:
+Every LLM call goes through `app/services/llm_client.py`, which makes a public demo safe to run at zero cost:
+
+| Control | Default | Setting |
+| --- | --- | --- |
+| LLM calls per day (all users) | 500 | `DAILY_LLM_CALL_LIMIT` |
+| Actions per user per day (questions, quizzes, summaries, uploads) | 20 | `USER_DAILY_ACTION_LIMIT` |
+| Sign-ups per IP per hour | 3 | `SIGNUPS_PER_IP_PER_HOUR` |
+| Model fallback on rate limit | `gpt-oss-20b` → `qwen3.8-27b` | `LLM_MODELS` |
+| Prompt-rewrite pre-call | off | `ENABLE_PROMPT_REWRITE` |
+
+Daily counters are stored in the database (UTC days). When a limit is reached, users see a friendly message (HTTP 429) instead of an error. Groq's free tier needs no payment method, so usage can never be billed.
+
+---
+
+## Weekly quiz emails (optional)
+
+Run the scheduler as a separate process:
 
 ```bash
 python -m app.scheduler
 ```
 
-It triggers `process_weekly_quizzes()` every Sunday at 09:00 server time.
-
-You can also trigger a run manually:
+Admin endpoints trigger a run manually. They are **disabled unless `ADMIN_API_KEY` is set** and require it in the `X-Admin-Key` header:
 
 ```bash
-# all users
-curl -X POST http://127.0.0.1:8000/api/v1/admin/send-weekly-quizzes
-
-# single user
-curl -X POST http://127.0.0.1:8000/api/v1/test/send-quiz-email/<user_id>
+curl -X POST http://localhost:8000/api/v1/admin/send-weekly-quizzes -H "X-Admin-Key: $ADMIN_API_KEY"
+curl -X POST http://localhost:8000/api/v1/test/send-quiz-email/<user_id> -H "X-Admin-Key: $ADMIN_API_KEY"
 ```
 
 ---
@@ -203,18 +196,19 @@ curl -X POST http://127.0.0.1:8000/api/v1/test/send-quiz-email/<user_id>
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/v1/auth/signup` | Create a user |
-| `POST` | `/api/v1/auth/login` | Get a JWT |
-| `POST` | `/api/v1/ask` | Ask a question (RAG over the local KB) |
-| `POST` | `/api/v1/projects` | Create a project |
+| `POST` | `/api/v1/auth/register` | Create an account |
+| `POST` | `/api/v1/auth/login-json` | Log in (JSON) and get a JWT |
+| `GET` | `/api/v1/auth/subscription/status` | Remaining actions today |
+| `POST` | `/api/v1/ask` | One-off RAG question (auth required) |
 | `POST` | `/api/v1/chats` | Start a chat |
-| `POST` | `/api/v1/chats/{id}/messages` | Send a message |
-| `POST` | `/api/v1/documents/process` | Upload PDF/DOCX and ask about it |
-| `GET`  | `/api/v1/weekly-quiz/{quiz_id}` | Fetch a weekly quiz |
-| `POST` | `/api/v1/weekly-quiz/{quiz_id}/submit` | Submit quiz answers |
-| `GET`  | `/health` | Liveness probe |
+| `POST` | `/api/v1/chats/{id}/messages` | Ask a question in a chat |
+| `POST` | `/api/v1/chats/{id}/quiz` | Generate a quiz from the latest answer |
+| `POST` | `/api/v1/quiz/submit` | Submit quiz results and update mastery |
+| `GET` | `/api/v1/progress` | Concept mastery |
+| `POST` | `/api/v1/documents/process` | Upload a PDF/DOCX (max 10 MB) and ask about it |
+| `GET` | `/health` | Liveness probe |
 
-Full schema at `/docs` (Swagger UI) once the backend is running.
+The full schema is at `/docs` once the backend is running.
 
 ---
 
@@ -222,38 +216,38 @@ Full schema at `/docs` (Swagger UI) once the backend is running.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `HF_API_TOKEN` | *(empty)* | Hugging Face Router API token |
-| `GENERATOR_MODEL` | `meta-llama/Llama-3.2-1B-Instruct` | LLM used for generation |
-| `MAX_EVIDENCE_CHARS` | `2000` | Truncate evidence passed to the LLM |
+| `GROQ_API_KEY` / `LLM_API_KEY` | *(empty)* | LLM API key |
+| `LLM_API_URL` | Groq chat completions URL | Any OpenAI-compatible endpoint |
+| `LLM_MODELS` | `openai/gpt-oss-20b,qwen/qwen3.8-27b` | Models, tried in order |
+| `DAILY_LLM_CALL_LIMIT` | `500` | Global LLM calls per day |
+| `USER_DAILY_ACTION_LIMIT` | `20` | Per-user actions per day |
+| `SIGNUPS_PER_IP_PER_HOUR` | `3` | Sign-up throttling |
+| `ENABLE_PROMPT_REWRITE` | `false` | Rewrite questions with an extra LLM call |
+| `SECRET_KEY` | random per process | JWT signing key |
+| `ADMIN_API_KEY` | *(empty = disabled)* | Key for admin email endpoints |
+| `CORS_ORIGINS` | `http://localhost:8501,http://localhost:3000` | Allowed browser origins |
+| `MAX_UPLOAD_MB` | `10` | Upload size limit |
+| `MAX_EVIDENCE_CHARS` | `2000` | Evidence passed to the LLM |
 | `REQUEST_TIMEOUT` | `120.0` | LLM HTTP timeout (seconds) |
-| `BACKEND_URL` | `http://localhost:8000` | Used by the Streamlit frontend |
-| `DEFAULT_API_TIMEOUT` | `30` | Frontend → backend timeout |
-| `LONG_API_TIMEOUT` | `300` | Frontend timeout for slow endpoints |
-| `SMTP_SERVER` | `smtp.gmail.com` | Outgoing mail server |
-| `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_USERNAME` / `SMTP_PASSWORD` | *(empty)* | SMTP creds |
+| `BACKEND_URL` | `http://localhost:8000` | Backend URL used by Streamlit |
+| `DEFAULT_API_TIMEOUT` / `LONG_API_TIMEOUT` | `30` / `300` | Frontend → backend timeouts |
+| `SMTP_SERVER` / `SMTP_PORT` | `smtp.gmail.com` / `587` | Mail server |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | *(empty)* | SMTP credentials (Gmail: use an App Password) |
 | `SENDER_EMAIL` / `SENDER_NAME` | *(empty)* / `EduReflect` | "From" identity |
 
 ---
 
 ## Roadmap
 
-- Replace the hard-coded JWT secret in `app/database/models.py` with an environment variable.
-- Admin auth on `/admin/send-weekly-quizzes`.
-- Dockerfile + `docker-compose` for one-command setup.
-- Pluggable LLM providers (OpenAI, Anthropic, local Ollama).
-- Better evaluation harness for answer quality.
-
----
-
-## License
-
-This project is released for educational use. Add a license of your choice (e.g. MIT) before publishing widely.
+- Answer verification: check each generated sentence against the evidence and rewrite unsupported claims.
+- Structured output for key terms and follow-up questions.
+- Evaluation harness for retrieval and answer quality.
 
 ---
 
 ## Acknowledgements
 
 - [FastAPI](https://fastapi.tiangolo.com/) · [Streamlit](https://streamlit.io/)
-- [Hugging Face Inference Router](https://huggingface.co/) and the `meta-llama/Llama-3.2-1B-Instruct` model
+- [Groq](https://groq.com/) for free LLM inference
 - [Sentence-Transformers](https://www.sbert.net/) (`intfloat/e5-base`) and [FAISS](https://github.com/facebookresearch/faiss)
+- NCERT textbooks and Wikipedia for knowledge-base content

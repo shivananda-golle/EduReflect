@@ -1,32 +1,36 @@
-fastapi
-uvicorn
-requests
-python-dotenv
-streamlit
-nltk
-beautifulsoup4
-fpdf
-sqlalchemy
-sentence-transformers
-faiss-cpu
-numpy
-pydantic
-python-jose[cryptography]  # For JWT tokens
-passlib[bcrypt]           # For password hashing
-python-multipart          # For form data
+# Tested with Python 3.12.
+# sentence-transformers pulls in PyTorch. On CPU-only machines, install the much smaller
+# CPU build first:  pip install torch --index-url https://download.pytorch.org/whl/cpu
 
+# API
+fastapi==0.141.1
+uvicorn==0.53.0
+python-multipart==0.0.6
+pydantic==2.13.5
+requests==2.34.2
+python-dotenv==1.2.3
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
+# Database
+sqlalchemy==2.0.52
+alembic==1.12.1
+
+# Retrieval
+sentence-transformers==6.0.1
+faiss-cpu==1.15.0
+numpy==2.5.3
+
+# Documents and exports
 PyPDF2==3.0.1
 python-docx==1.1.0
-fpdf==1.7.2
-bcrypt==4.0.1
-passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
-python-multipart==0.0.6
-
-
-alembic==1.12.1
 reportlab==4.0.7
+
+# Frontend
+streamlit==1.56.0
+
+# Weekly quiz scheduler
 APScheduler==3.10.4
-
-
-APScheduler>=3.10.0
