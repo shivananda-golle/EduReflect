@@ -5,7 +5,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+import logging
+import secrets
 import uuid
+
+from app.utils.config import SECRET_KEY as CONFIGURED_SECRET_KEY
 
 Base = declarative_base()
 
@@ -13,7 +17,12 @@ Base = declarative_base()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
-SECRET_KEY = "your-secret-key-change-in-production"  # Move to .env in production
+if CONFIGURED_SECRET_KEY:
+    SECRET_KEY = CONFIGURED_SECRET_KEY
+else:
+    # Never fall back to a known value: an ephemeral key is safe, it just logs everyone out on restart.
+    SECRET_KEY = secrets.token_hex(32)
+    logging.getLogger(__name__).warning("SECRET_KEY is not set; using a random key for this process.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

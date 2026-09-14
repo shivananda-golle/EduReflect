@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends
+import secrets
+
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
@@ -9,8 +11,17 @@ from app.services.generator import generate_answer
 from app.services.weekly_quiz_scheduler import send_quiz_to_single_user, process_weekly_quizzes
 from app.database.models import get_db, User, WeeklyQuiz, WeeklyQuizAttempt
 from app.api.auth_routes import get_current_user
+from app.utils.config import ADMIN_API_KEY
 
 router = APIRouter(prefix="/api/v1", tags=["general"])
+
+
+def require_admin(x_admin_key: Optional[str] = Header(default=None)):
+    """Allow the request only if X-Admin-Key matches ADMIN_API_KEY. Disabled when the key is unset."""
+    if not ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Admin endpoints are disabled")
+    if not x_admin_key or not secrets.compare_digest(x_admin_key, ADMIN_API_KEY):
+        raise HTTPException(status_code=403, detail="Invalid admin key")
 
 
 class ProjectCreate(BaseModel):
@@ -36,8 +47,8 @@ class QuestionRequest(BaseModel):
 class AnswerResponse(BaseModel):
     question: str
     final_answer: str
-    evidence: List[Dict[str, Any]]
-    conf: Optional[float] = None
+    evidence: List[str]
+    conf: Optional[str] = None
     caveat: Optional[str] = None
     terms: List[str]
     followups: List[str]
@@ -59,10 +70,17 @@ class QuizAttemptResponse(BaseModel):
 
 
 @router.post("/ask", response_model=AnswerResponse)
-def ask_question(payload: QuestionRequest):
+def ask_question(
+    payload: QuestionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     question = payload.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    if current_user.monthly_chats_used >= current_user.monthly_chat_limit:
+        raise HTTPException(status_code=429, detail="Monthly chat limit exceeded.")
 
     # Try to retrieve from knowledge base
     try:
@@ -94,6 +112,9 @@ def ask_question(payload: QuestionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
 
+    current_user.monthly_chats_used += 1
+    db.commit()
+
     return AnswerResponse(
         question=question,
         final_answer=final_answer,
@@ -107,12 +128,12 @@ def ask_question(payload: QuestionRequest):
 
 # ============ Weekly Quiz Email Endpoints ============
 
-@router.post("/admin/send-weekly-quizzes")
+@router.post("/admin/send-weekly-quizzes", dependencies=[Depends(require_admin)])
 def trigger_weekly_quizzes():
     """
     Admin endpoint to manually trigger weekly quiz emails for all active users.
-    In production, protect this with admin authentication.
-    
+    Requires the X-Admin-Key header.
+
     Returns:
         Dictionary with counts of sent, failed, and skipped emails
     """
@@ -127,7 +148,7 @@ def trigger_weekly_quizzes():
         raise HTTPException(status_code=500, detail=f"Failed to process quizzes: {e}")
 
 
-@router.post("/test/send-quiz-email/{user_id}")
+@router.post("/test/send-quiz-email/{user_id}", dependencies=[Depends(require_admin)])
 def test_send_quiz_email(user_id: str):
     """
     Test endpoint to send a quiz email to a specific user.

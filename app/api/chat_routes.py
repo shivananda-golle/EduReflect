@@ -14,6 +14,7 @@ from app.services.summarizer import generate_chat_summary
 from app.services.document_processor import process_document
 from app.services.question_generator import generate_quiz
 from app.services.concept_tracker import update_user_progress, get_user_mastery
+from app.utils.config import MAX_UPLOAD_MB
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 
@@ -485,9 +486,14 @@ async def process_document_endpoint(
     if not file.filename.lower().endswith(('.pdf', '.docx')):
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
     
+    # Read one byte past the limit so oversized files are rejected without loading them fully
+    max_bytes = MAX_UPLOAD_MB * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB} MB)")
+
     # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
-        content = await file.read()
         temp_file.write(content)
         temp_file_path = temp_file.name
     
@@ -523,6 +529,10 @@ def generate_chat_quiz(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    chat = db.query(Chat).filter(Chat.id == chat_id, Chat.user_id == current_user.id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
     # Get the last assistant message
     last_msg = db.query(Message).filter(
         Message.chat_id == chat_id,

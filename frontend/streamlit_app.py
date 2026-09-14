@@ -488,27 +488,6 @@ def show_subscription_info():
             st.caption(f"Expires: {sub.get('expires_at')[:10]}")
     else:
         st.warning("⚠️ Subscription expired or inactive")
-        
-        with st.expander("🚀 Upgrade Your Plan"):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("🆓 Free\n50 chats/month", use_container_width=True):
-                    upgrade_subscription("free")
-            with col2:
-                if st.button("💎 Basic\n500 chats/month", use_container_width=True):
-                    upgrade_subscription("basic")
-            with col3:
-                if st.button("👑 Premium\n2000 chats/month", use_container_width=True):
-                    upgrade_subscription("premium")
-
-def upgrade_subscription(tier):
-    result = api_post("/auth/subscription", {"tier": tier, "duration_months": 1})
-    if result:
-        st.success(f"Upgraded to {tier.title()} plan!")
-        user_info = api_get("/auth/me")
-        if user_info:
-            st.session_state.user = user_info
-        st.rerun()
 
 # ============ Chat Management Functions ============
 def create_new_chat(is_temporary=False, project_id=None):

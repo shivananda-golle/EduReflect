@@ -43,11 +43,6 @@ class UserResponse(BaseModel):
     created_at: str
 
 
-class SubscriptionUpdate(BaseModel):
-    tier: str  # free, basic, premium
-    duration_months: int = 1
-
-
 # Dependency to get current user
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
@@ -193,48 +188,10 @@ def update_user_profile(
     return {"message": "Profile updated successfully"}
 
 
-@router.post("/subscription")
-def update_subscription(
-    subscription: SubscriptionUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update user subscription (in production, integrate with payment processor)"""
-    valid_tiers = {
-        "free": {"limit": 50},
-        "basic": {"limit": 500},
-        "premium": {"limit": 2000}
-    }
-    
-    if subscription.tier not in valid_tiers:
-        raise HTTPException(status_code=400, detail="Invalid subscription tier")
-    
-    # Calculate expiry date
-    expires_at = datetime.utcnow() + timedelta(days=30 * subscription.duration_months)
-    
-    current_user.subscription_tier = subscription.tier
-    current_user.subscription_expires_at = expires_at
-    current_user.monthly_chat_limit = valid_tiers[subscription.tier]["limit"]
-    current_user.subscription_active = True
-    
-    db.commit()
-    
-    return {
-        "message": f"Subscription updated to {subscription.tier}",
-        "expires_at": expires_at.isoformat(),
-        "monthly_limit": current_user.monthly_chat_limit
-    }
-
+# Self-service subscription upgrades and usage resets were removed: without a payment
+# processor they let any user bypass the chat limit that caps LLM spend.
 
 @router.get("/subscription/status")
 def get_subscription_status(current_user: User = Depends(get_current_user)):
     """Get user's subscription status"""
     return current_user.get_subscription_status()
-
-
-@router.post("/reset-usage")
-def reset_monthly_usage(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Reset monthly chat usage (admin function or cron job in production)"""
-    current_user.monthly_chats_used = 0
-    db.commit()
-    return {"message": "Monthly usage reset successfully"}
