@@ -1,24 +1,32 @@
 import json
-from pathlib import Path
-from typing import List, Tuple, Optional
+import threading
+from typing import List
 
 import numpy as np
 import faiss
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
-INDEX_DIR = Path("data/index")
+from app.utils.config import EMBEDDING_MODEL, INDEX_DIR
+
 FAISS_INDEX_PATH = INDEX_DIR / "faiss.index"
 METADATA_PATH = INDEX_DIR / "metadata.json"
 
 _model = None
 _index = None
 _metadata = None
+_load_lock = threading.Lock()
 
 
 def _lazy_load():
+    with _load_lock:
+        return _load()
+
+
+def _load():
     global _model, _index, _metadata
     if _model is None:
-        _model = SentenceTransformer("intfloat/e5-base")
+        # ONNX runtime model (no PyTorch): small enough for free hosting tiers
+        _model = TextEmbedding(EMBEDDING_MODEL)
     if _index is None:
         if not FAISS_INDEX_PATH.exists():
             return False
@@ -31,6 +39,13 @@ def _lazy_load():
     return True
 
 
+def embed_query(question: str) -> np.ndarray:
+    # query_embed adds the model's retrieval instruction prefix
+    vector = np.array(list(_model.query_embed([question])), dtype="float32")
+    faiss.normalize_L2(vector)
+    return vector
+
+
 def retrieve_from_kb(question: str, top_k: int = 3) -> List[str]:
     """
     Retrieve top-k relevant chunks from the local knowledge base.
@@ -40,9 +55,7 @@ def retrieve_from_kb(question: str, top_k: int = 3) -> List[str]:
     if not ok:
         return []
 
-    query_embedding = _model.encode(f"query: {question}", normalize_embeddings=True)
-
-    scores, indices = _index.search(np.array([query_embedding]), top_k)
+    scores, indices = _index.search(embed_query(question), top_k)
 
     results = []
     for score, idx in zip(scores[0], indices[0]):

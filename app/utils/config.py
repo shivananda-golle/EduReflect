@@ -1,8 +1,12 @@
 
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def _env_bool(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
@@ -21,12 +25,23 @@ SIGNUPS_PER_IP_PER_HOUR = int(os.getenv("SIGNUPS_PER_IP_PER_HOUR", "3"))
 # Extra LLM call that rewrites each question before retrieval; off by default to halve usage.
 ENABLE_PROMPT_REWRITE = _env_bool("ENABLE_PROMPT_REWRITE", "false")
 
+# Retrieval: the index in data/index must be built with this same embedding model
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
+INDEX_DIR = PROJECT_ROOT / "data" / "index"
+
 # Evidence / truncation
 MAX_EVIDENCE_CHARS = int(os.getenv("MAX_EVIDENCE_CHARS", "2000"))
 
 # Request timeouts (seconds)
 # HF generation + first-time downloads can exceed 30s on some machines/networks.
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", "120.0"))
+
+# Database (SQLite by default; any SQLAlchemy URL works, e.g. a hosted Postgres)
+DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{PROJECT_ROOT / 'edureflect.db'}"
+# Hosted Postgres URLs (e.g. Neon) use the plain postgresql:// scheme; route them to the psycopg 3 driver
+for _prefix in ("postgres://", "postgresql://"):
+    if DATABASE_URL.startswith(_prefix):
+        DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len(_prefix):]
 
 # JWT signing key. Set a long random value in production (e.g. `python -c "import secrets; print(secrets.token_hex(32))"`).
 SECRET_KEY = os.getenv("SECRET_KEY", "")

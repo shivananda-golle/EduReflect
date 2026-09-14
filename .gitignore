@@ -26,8 +26,8 @@ ENV/
 # Project local state
 edureflect.db
 
-# Streamlit
-.streamlit/
+# Streamlit (config.toml is committed; secrets never are)
+.streamlit/secrets.toml
 
 # OS / editor
 .DS_Store
@@ -37,11 +37,9 @@ Thumbs.db
 # Local git backups created during cleanup
 .git_backup_*/
 
-# Data artifacts (often large; adjust if you want to version datasets)
-data/raw_pdfs/
-
-# Do not publish local corpora / indexes
-data/
+# Raw corpora stay local; the built index (~5 MB) is committed so the app can be deployed from git
+data/*
+!data/index/
 
 # Ad-hoc local test/scratch files
 test*.py

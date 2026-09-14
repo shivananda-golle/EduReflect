@@ -1,6 +1,4 @@
-# Tested with Python 3.12.
-# sentence-transformers pulls in PyTorch. On CPU-only machines, install the much smaller
-# CPU build first:  pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Tested with Python 3.12. No PyTorch: embeddings run on ONNX Runtime via fastembed.
 
 # API
 fastapi==0.141.1
@@ -18,9 +16,10 @@ bcrypt==4.0.1
 # Database
 sqlalchemy==2.0.52
 alembic==1.12.1
+psycopg[binary]==3.3.5
 
 # Retrieval
-sentence-transformers==6.0.1
+fastembed==0.8.0
 faiss-cpu==1.15.0
 numpy==2.5.3
 

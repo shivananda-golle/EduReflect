@@ -1,3 +1,6 @@
+import logging
+import threading
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,6 +23,16 @@ app.add_middleware(
 def on_startup():
     # Create any missing tables (a fresh database, or new tables such as usage_counters)
     init_db()
+    # Load the embedding model and FAISS index in the background so the first question is fast
+    threading.Thread(target=warm_up_retriever, daemon=True).start()
+
+
+def warm_up_retriever():
+    try:
+        from app.services.kb_retriever import _lazy_load
+        _lazy_load()
+    except Exception as e:
+        logging.getLogger(__name__).warning("Retriever warm-up failed: %s", e)
 
 
 @app.exception_handler(LimitExceeded)

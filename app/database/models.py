@@ -9,7 +9,7 @@ import logging
 import secrets
 import uuid
 
-from app.utils.config import SECRET_KEY as CONFIGURED_SECRET_KEY
+from app.utils.config import DATABASE_URL as CONFIGURED_DATABASE_URL, SECRET_KEY as CONFIGURED_SECRET_KEY
 
 Base = declarative_base()
 
@@ -295,8 +295,12 @@ def get_password_hash(password: str) -> str:
 
 
 # Database setup
-DATABASE_URL = "sqlite:///./edureflect.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = CONFIGURED_DATABASE_URL
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

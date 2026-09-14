@@ -2,7 +2,7 @@
 
 An AI-powered study assistant. EduReflect answers students' questions from a curated science and maths knowledge base using Retrieval-Augmented Generation (RAG), turns conversations into quizzes, tracks concept mastery, and answers questions about uploaded PDFs and DOCX files.
 
-> **Stack:** FastAPI · Streamlit · SQLAlchemy · FAISS + Sentence-Transformers (`intfloat/e5-base`) · Groq (OpenAI-compatible LLM API) · APScheduler
+> **Stack:** FastAPI · Streamlit · SQLAlchemy (SQLite / Postgres) · FAISS + fastembed (`BAAI/bge-small-en-v1.5`, ONNX) · Groq (OpenAI-compatible LLM API) · APScheduler
 
 **Live demo:** _coming soon_
 
@@ -10,13 +10,13 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 
 ## Features
 
-- **Grounded answers (RAG)**: questions are embedded with E5, matched against a FAISS index of 2,316 passages, and answered by an LLM using only the retrieved evidence, which is shown alongside the answer.
+- **Grounded answers (RAG)**: questions are embedded with bge-small, matched against a FAISS index of 2,316 passages, and answered by an LLM using only the retrieved evidence, which is shown alongside the answer.
 - **Configurable response style**: format (brief / bullets / presentation), depth (kid / standard / exam), and length (short / medium / long), plus optional diagnostic questions.
 - **Quizzes and mastery tracking**: generate a 5-question multiple-choice quiz from any answer; results update per-concept mastery levels.
 - **Document Q&A**: upload a PDF or DOCX, get a summary, and ask questions about it.
 - **Study workspace**: multi-turn chats grouped into projects, pinning, search, message editing with history, chat summaries, and PDF export.
 - **Weekly quiz emails** (optional): a scheduled job builds a personalised quiz from each user's recent chats and emails a link.
-- **Runs entirely on free tiers**: a global daily LLM budget, per-user daily limits, and sign-up throttling keep a public demo within free quotas.
+- **Runs entirely on free tiers**: no PyTorch (the whole app peaks at ~380 MB RAM), plus a global daily LLM budget, per-user daily limits, and sign-up throttling keep a public demo within free quotas.
 
 ---
 
@@ -32,8 +32,8 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
                          ┌─────────────────────────────────────┼─────────────────────────────┐
                          ▼                                     ▼                             ▼
                ┌───────────────────┐             ┌───────────────────────┐     ┌───────────────────────┐
-               │  SQLite database  │             │  kb_retriever         │     │  llm_client           │
-               │  users, chats,    │             │  E5 embeddings +      │     │  Groq free tier       │
+               │  SQLite/Postgres  │             │  kb_retriever         │     │  llm_client           │
+               │  users, chats,    │             │  bge-small (ONNX) +   │     │  Groq free tier       │
                │  quizzes, usage   │             │  FAISS (data/index/)  │     │  daily budget +       │
                │  counters         │             │                       │     │  model fallback       │
                └───────────────────┘             └───────────────────────┘     └───────────────────────┘
@@ -72,7 +72,9 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 │       ├── config.py              # environment-driven settings
 │       └── email_config.py        # SMTP settings
 ├── frontend/
-│   └── streamlit_app.py           # Streamlit UI
+│   ├── streamlit_app.py           # Streamlit UI
+│   └── embedded_backend.py        # optional: run the API inside the Streamlit process
+├── data/index/                    # prebuilt FAISS index + passage metadata
 ├── scripts/                       # knowledge-base preparation (PDF → text, Wikipedia, cleaning)
 ├── alembic/                       # historical migrations (tables are created on startup)
 ├── requirements.txt
@@ -99,13 +101,10 @@ source .venv/bin/activate
 ### 2. Install dependencies
 
 ```bash
-# Optional but recommended without a GPU: the CPU build of PyTorch is ~10x smaller
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-
 pip install -r requirements.txt
 ```
 
-The first question downloads the `intfloat/e5-base` embedding model (~440 MB).
+The embedding model (`BAAI/bge-small-en-v1.5`, ~70 MB ONNX) downloads automatically on first start.
 
 ### 3. Configure environment
 
@@ -119,9 +118,9 @@ cp .env.example .env
 | Stable logins (recommended) | `SECRET_KEY`: generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | Weekly quiz emails (optional) | `SMTP_USERNAME`, `SMTP_PASSWORD`, `SENDER_EMAIL`, `ADMIN_API_KEY` |
 
-### 4. Add a knowledge base
+### 4. Knowledge base
 
-The app answers from `data/index/faiss.index` and `data/index/metadata.json`. The `data/` folder is not committed; see [Knowledge base](#knowledge-base) to build one.
+The prebuilt index is included in `data/index/` (`faiss.index` + `metadata.json`). See [Knowledge base](#knowledge-base) to rebuild it or use your own content.
 
 ### 5. Run
 
@@ -142,7 +141,7 @@ streamlit run frontend/streamlit_app.py
 
 The reference index contains **2,316 passages**:
 
-- **1,207** from NCERT Class 9 Mathematics and Science textbooks
+- **1,207** from NCERT textbooks (Class 9 Mathematics, Class 10 Science)
 - **1,109** from Wikipedia articles on core science topics (physics, chemistry, biology, energy, forces, and more)
 
 To build your own:
@@ -155,7 +154,26 @@ python scripts/clean_text.py         # data/raw/ → data/clean/
 python -m app.services.kb_builder    # data/clean/ → data/index/
 ```
 
-Passages are ~120-word chunks; tiny or symbol-heavy chunks are filtered out.
+Passages are ~120-word chunks; tiny or symbol-heavy chunks are filtered out. After changing `EMBEDDING_MODEL`, re-embed the existing passages with `python -m app.services.kb_builder --from-metadata`.
+
+---
+
+## Deploy for free (Streamlit Community Cloud)
+
+The whole app runs as a single Streamlit process: with `EMBEDDED_BACKEND=true`, the FastAPI backend starts on a background thread bound to localhost, so only the UI is public.
+
+1. Create a free Postgres database (e.g. [Neon](https://neon.tech)) so accounts survive restarts, and copy its connection string.
+2. On [share.streamlit.io](https://share.streamlit.io), create an app from this repository: branch `main`, main file `frontend/streamlit_app.py`, Python 3.12.
+3. In **Advanced settings → Secrets**, add:
+
+   ```toml
+   EMBEDDED_BACKEND = "true"
+   GROQ_API_KEY = "gsk_..."
+   SECRET_KEY = "a-long-random-hex-string"
+   DATABASE_URL = "postgresql://user:password@host/dbname?sslmode=require"
+   ```
+
+Top-level secrets are exported as environment variables before the backend starts.
 
 ---
 
@@ -217,6 +235,9 @@ The full schema is at `/docs` once the backend is running.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GROQ_API_KEY` / `LLM_API_KEY` | *(empty)* | LLM API key |
+| `DATABASE_URL` | SQLite file in the project root | Any SQLAlchemy URL; `postgresql://` URLs use psycopg 3 |
+| `EMBEDDED_BACKEND` | `false` | Run the API inside the Streamlit process (single-process hosting) |
+| `EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | fastembed model; must match the index |
 | `LLM_API_URL` | Groq chat completions URL | Any OpenAI-compatible endpoint |
 | `LLM_MODELS` | `openai/gpt-oss-20b,qwen/qwen3.8-27b` | Models, tried in order |
 | `DAILY_LLM_CALL_LIMIT` | `500` | Global LLM calls per day |
@@ -249,5 +270,5 @@ The full schema is at `/docs` once the backend is running.
 
 - [FastAPI](https://fastapi.tiangolo.com/) · [Streamlit](https://streamlit.io/)
 - [Groq](https://groq.com/) for free LLM inference
-- [Sentence-Transformers](https://www.sbert.net/) (`intfloat/e5-base`) and [FAISS](https://github.com/facebookresearch/faiss)
+- [fastembed](https://github.com/qdrant/fastembed) with `BAAI/bge-small-en-v1.5`, and [FAISS](https://github.com/facebookresearch/faiss)
 - NCERT textbooks and Wikipedia for knowledge-base content

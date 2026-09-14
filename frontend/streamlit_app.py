@@ -1,4 +1,5 @@
 import os
+import sys
 import streamlit as st
 import requests
 from io import BytesIO
@@ -13,7 +14,17 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import embedded_backend
+
+st.set_page_config(page_title="EduReflect", page_icon="📘", layout="wide")
+
+# Secrets must be in the environment before the backend is imported
+embedded_backend.export_secrets_to_env()
+if embedded_backend.is_enabled():
+    BACKEND_URL = embedded_backend.start(int(os.getenv("EMBEDDED_BACKEND_PORT", "8000")))
+else:
+    BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 API_BASE = f"{BACKEND_URL}/api/v1"
 
 # Request timeouts (seconds)
@@ -35,8 +46,6 @@ def _pick_timeout(endpoint: str, files: bool = False) -> float:
     if any(m in endpoint for m in slow_markers):
         return LONG_API_TIMEOUT
     return DEFAULT_API_TIMEOUT
-
-st.set_page_config(page_title="EduReflect", page_icon="📘", layout="wide")
 
 # ============ Session State Initialization ============
 def init_session_state():
@@ -298,10 +307,12 @@ def export_quiz_report(concept: str, percentage: float, quiz_items: list, studen
 def _client_headers():
     """Forward the visitor's IP so the backend can apply per-IP limits (it sees all requests from this server)."""
     try:
-        ip = st.context.ip_address
+        # Behind a hosting proxy the direct peer is the proxy; the visitor is the first X-Forwarded-For entry
+        forwarded = st.context.headers.get("X-Forwarded-For", "")
+        ip = forwarded.split(",")[0].strip() or st.context.ip_address
     except Exception:
         ip = None
-    return {"X-Client-IP": ip} if ip else {}
+    return {"X-Client-IP": ip} if isinstance(ip, str) and ip else {}
 
 def _show_api_error(e):
     """Show the backend's message (e.g. a friendly limit notice) instead of a raw HTTP error."""

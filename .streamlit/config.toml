@@ -1,0 +1,6 @@
+[server]
+# Matches the backend's MAX_UPLOAD_MB
+maxUploadSize = 10
+
+[browser]
+gatherUsageStats = false

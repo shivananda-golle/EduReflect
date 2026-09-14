@@ -1,18 +1,22 @@
+"""
+Build the FAISS index used by kb_retriever.
+
+    python -m app.services.kb_builder                   # chunk data/clean/**/*.txt and embed
+    python -m app.services.kb_builder --from-metadata   # re-embed passages already in metadata.json
+                                                        # (use after changing EMBEDDING_MODEL)
+"""
+import argparse
 import json
-from pathlib import Path
+
 import numpy as np
 import faiss
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
-CLEAN_DATA_DIR = Path("data/clean")
-INDEX_DIR = Path("data/index")
+from app.utils.config import EMBEDDING_MODEL, INDEX_DIR, PROJECT_ROOT
 
-INDEX_DIR.mkdir(parents=True, exist_ok=True)
-
+CLEAN_DATA_DIR = PROJECT_ROOT / "data" / "clean"
 FAISS_INDEX_PATH = INDEX_DIR / "faiss.index"
 METADATA_PATH = INDEX_DIR / "metadata.json"
-
-model = SentenceTransformer("intfloat/e5-base")
 
 
 def chunk_text(text: str, chunk_size: int = 120):
@@ -38,46 +42,60 @@ def chunk_text(text: str, chunk_size: int = 120):
     return chunks
 
 
-def main():
-    passages = []
+def load_clean_passages():
     metadata = []
 
-    txt_files = list(CLEAN_DATA_DIR.rglob("*.txt"))
+    txt_files = sorted(CLEAN_DATA_DIR.rglob("*.txt"))
     if not txt_files:
         print("❌ No cleaned text files found in data/clean/")
-        return
+        return metadata
 
     print(f"📚 Found {len(txt_files)} cleaned text files")
 
     for file in txt_files:
         print(f"➡️ Processing {file}")
         text = file.read_text(encoding="utf-8", errors="ignore")
-        chunks = chunk_text(text)
-
-        for chunk in chunks:
-            passages.append("passage: " + chunk)
+        for chunk in chunk_text(text):
             metadata.append({
-                "source": str(file),
+                "source": file.relative_to(PROJECT_ROOT).as_posix(),
                 "chunk_id": len(metadata),
                 "text": chunk
             })
 
-    if not passages:
-        print("❌ No passages created after filtering.")
+    return metadata
+
+
+def load_existing_passages():
+    with open(METADATA_PATH, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+    for item in metadata:
+        item["source"] = item["source"].replace("\\", "/")
+    print(f"📚 Loaded {len(metadata)} passages from {METADATA_PATH}")
+    return metadata
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--from-metadata", action="store_true", help="re-embed passages from the existing metadata.json")
+    args = parser.parse_args()
+
+    metadata = load_existing_passages() if args.from_metadata else load_clean_passages()
+    if not metadata:
+        print("❌ No passages to index.")
         return
 
-    print(f"🔢 Total chunks created: {len(passages)}")
+    print(f"🔢 Embedding {len(metadata)} passages with {EMBEDDING_MODEL}")
+    model = TextEmbedding(EMBEDDING_MODEL)
+    embeddings = np.array(list(model.passage_embed([m["text"] for m in metadata], batch_size=64)), dtype="float32")
+    faiss.normalize_L2(embeddings)
 
-    embeddings = model.encode(passages, normalize_embeddings=True, show_progress_bar=True)
+    index = faiss.IndexFlatIP(embeddings.shape[1])
+    index.add(embeddings)
 
-    dim = embeddings.shape[1]
-    index = faiss.IndexFlatIP(dim)
-    index.add(np.array(embeddings))
-
+    INDEX_DIR.mkdir(parents=True, exist_ok=True)
     faiss.write_index(index, str(FAISS_INDEX_PATH))
-
     with open(METADATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2)
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
 
     print("\n✅ Knowledge base built successfully")
     print(f"📁 FAISS index saved to: {FAISS_INDEX_PATH}")

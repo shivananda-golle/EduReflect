@@ -48,7 +48,7 @@ IMPORTANT:
         content = content.strip()
         
         try:
-            quiz_data = json.loads(content)
+            quiz_data = _loads_lenient(content)
             # Validate structure
             if isinstance(quiz_data, list):
                 questions = quiz_data
@@ -65,7 +65,7 @@ IMPORTANT:
             # Fallback: try to find JSON array in text
             match = re.search(r'\[.*\]', content, re.DOTALL)
             if match:
-                questions = json.loads(match.group(0))
+                questions = _loads_lenient(match.group(0))
                 questions = fix_letter_based_answers(questions)
                 return questions
             return []
@@ -75,6 +75,17 @@ IMPORTANT:
     except Exception as e:
         print(f"Error generating quiz: {e}")
         return []
+
+
+def _loads_lenient(text: str):
+    """
+    Parse model JSON. Math answers often contain LaTeX (e.g. \\sqrt) whose backslashes are invalid
+    JSON escapes; on failure, escape backslashes that don't start a valid escape and retry.
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return json.loads(re.sub(r'\\(?![\\"/u])', r'\\\\', text))
 
 
 def fix_letter_based_answers(questions: list) -> list:
