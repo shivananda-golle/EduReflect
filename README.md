@@ -4,7 +4,7 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 
 > **Stack:** FastAPI · Streamlit · SQLAlchemy (SQLite / Postgres) · FAISS + fastembed (`BAAI/bge-small-en-v1.5`, ONNX) · Groq (OpenAI-compatible LLM API) · APScheduler
 
-**Live demo:** _coming soon_
+**Live demo:** **<https://edureflect.streamlit.app/>** (free tier: sign up to try it; 20 actions per user per day. If the app has been idle, click "wake up" and give it about a minute.)
 
 ---
 
