@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
@@ -14,7 +15,8 @@ from app.services.summarizer import generate_chat_summary
 from app.services.document_processor import process_document
 from app.services.question_generator import generate_quiz
 from app.services.concept_tracker import update_user_progress, get_user_mastery
-from app.utils.config import MAX_UPLOAD_MB
+from app.services.usage_limits import limit_user_action
+from app.utils.config import MAX_UPLOAD_MB, ENABLE_PROMPT_REWRITE
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
 
@@ -92,9 +94,6 @@ def create_chat(
     current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    if current_user.monthly_chats_used >= current_user.monthly_chat_limit:
-        raise HTTPException(status_code=429, detail="Monthly chat limit exceeded. Upgrade your subscription.")
-    
     new_chat = Chat(
         user_id=current_user.id,
         project_id=chat.project_id,
@@ -312,10 +311,9 @@ def add_message_and_respond(
     chat = db.query(Chat).filter(Chat.id == chat_id, Chat.user_id == current_user.id).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    
-    if current_user.monthly_chats_used >= current_user.monthly_chat_limit:
-        raise HTTPException(status_code=429, detail="Monthly chat limit exceeded. Upgrade your subscription.")
-    
+
+    limit_user_action(current_user)
+
     question = request.question.strip()
     target_language = request.language or chat.language
     
@@ -328,8 +326,8 @@ def add_message_and_respond(
             document_context = parts[0].replace("Document context:", "").strip()
             question = parts[1].strip()
     
-    optimized_question = optimize_prompt(question)
-    
+    optimized_question = optimize_prompt(question) if ENABLE_PROMPT_REWRITE else question
+
     # Add user message
     user_msg = Message(
         chat_id=chat_id,
@@ -468,7 +466,8 @@ def summarize_chat(
     
     if len(messages) < 2:
         raise HTTPException(status_code=400, detail="Not enough messages to summarize")
-    
+
+    limit_user_action(current_user)
     summary = generate_chat_summary(messages)
     chat.summary = summary
     db.commit()
@@ -492,13 +491,16 @@ async def process_document_endpoint(
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=f"File too large (max {MAX_UPLOAD_MB} MB)")
 
+    await run_in_threadpool(limit_user_action, current_user)
+
     # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
         temp_file.write(content)
         temp_file_path = temp_file.name
     
     try:
-        result = process_document(temp_file_path, question)
+        # PDF parsing and LLM calls are blocking; keep them off the event loop
+        result = await run_in_threadpool(process_document, temp_file_path, question)
         return {
             "filename": file.filename,
             "summary": result.get("summary", ""),
@@ -543,6 +545,7 @@ def generate_chat_quiz(
         raise HTTPException(status_code=400, detail="No assistant message found to generate quiz from")
     
     # Generate quiz
+    limit_user_action(current_user)
     quiz = generate_quiz(last_msg.content, num_questions=5)
     return {"quiz": quiz}
 

@@ -1,13 +1,7 @@
-import requests
 from typing import List, Dict
-from app.utils.config import HF_API_TOKEN, GENERATOR_MODEL, REQUEST_TIMEOUT
 
-HF_CHAT_URL = "https://router.huggingface.co/v1/chat/completions"
-
-HEADERS = {
-    "Authorization": f"Bearer {HF_API_TOKEN}",
-    "Content-Type": "application/json"
-}
+from app.services import llm_client
+from app.services.usage_limits import LimitExceeded
 
 
 def generate_chat_summary(messages: List[Dict[str, str]]) -> str:
@@ -30,19 +24,14 @@ Conversation:
 
 Summary:"""
 
-    payload = {
-        "model": GENERATOR_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "max_tokens": 150,
-        "temperature": 0.3
-    }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = requests.post(HF_CHAT_URL, headers=HEADERS, json=payload, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+        return llm_client.chat(messages, max_tokens=150, temperature=0.3)
+    except LimitExceeded:
+        raise
     except Exception as e:
         return f"Summary generation failed: {str(e)}"

@@ -3,6 +3,7 @@ import PyPDF2
 from docx import Document
 from typing import Dict, Any
 from app.services.generator import generate_answer
+from app.services.usage_limits import LimitExceeded
 
 def extract_text_from_pdf(file_path: str) -> str:
     """Extract text from PDF file"""
@@ -37,7 +38,9 @@ def process_document(file_path: str, question: str = "") -> Dict[str, Any]:
     
     try:
         summary = generate_answer(summary_prompt, [], answer_format="brief")[0]
-    except:
+    except LimitExceeded:
+        raise
+    except Exception:
         summary = f"Document processed successfully. Length: {len(full_text)} characters."
     
     result = {"summary": summary, "full_text": full_text}
@@ -48,7 +51,9 @@ def process_document(file_path: str, question: str = "") -> Dict[str, Any]:
         try:
             answer = generate_answer(question, documents, answer_format="brief")[0]
             result["answer"] = answer
-        except:
+        except LimitExceeded:
+            raise
+        except Exception:
             result["answer"] = "Unable to generate answer from document."
     
     return result

@@ -295,8 +295,33 @@ def export_quiz_report(concept: str, percentage: float, quiz_items: list, studen
     return pdf_data
 
 # ============ Authentication Functions ============
+def _client_headers():
+    """Forward the visitor's IP so the backend can apply per-IP limits (it sees all requests from this server)."""
+    try:
+        ip = st.context.ip_address
+    except Exception:
+        ip = None
+    return {"X-Client-IP": ip} if ip else {}
+
+def _show_api_error(e):
+    """Show the backend's message (e.g. a friendly limit notice) instead of a raw HTTP error."""
+    response = getattr(e, "response", None)
+    if response is not None:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = None
+        if isinstance(detail, str):
+            if response.status_code == 429:
+                st.warning(f"⏳ {detail}")
+            else:
+                st.error(detail)
+            return
+    st.error(f"API Error: {e}")
+
 def api_post(endpoint, data=None, auth=True, files=None):
     headers = {"Content-Type": "application/json"} if not files else {}
+    headers.update(_client_headers())
     if auth and st.session_state.token:
         headers["Authorization"] = f"Bearer {st.session_state.token}"
     
@@ -329,11 +354,11 @@ def api_post(endpoint, data=None, auth=True, files=None):
         )
         return None
     except Exception as e:
-        st.error(f"API Error: {e}")
+        _show_api_error(e)
         return None
 
 def api_get(endpoint, auth=True):
-    headers = {}
+    headers = _client_headers()
     if auth and st.session_state.token:
         headers["Authorization"] = f"Bearer {st.session_state.token}"
     
@@ -356,11 +381,11 @@ def api_get(endpoint, auth=True):
         )
         return None
     except Exception as e:
-        st.error(f"API Error: {e}")
+        _show_api_error(e)
         return None
 
 def api_put(endpoint, data=None, auth=True):
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", **_client_headers()}
     if auth and st.session_state.token:
         headers["Authorization"] = f"Bearer {st.session_state.token}"
     
@@ -381,7 +406,7 @@ def api_put(endpoint, data=None, auth=True):
         st.error("Request timed out. Please try again.")
         return None
     except Exception as e:
-        st.error(f"API Error: {e}")
+        _show_api_error(e)
         return None
 
 def login_user(username, password):
@@ -477,13 +502,14 @@ def show_subscription_info():
     if not st.session_state.user:
         return
     
-    sub = st.session_state.user.get("subscription", {})
+    # Refresh so the remaining-actions count stays current after each question
+    sub = api_get("/auth/subscription/status") or st.session_state.user.get("subscription", {})
     tier_colors = {"free": "🆓", "basic": "💎", "premium": "👑"}
     
     st.markdown(f"**{tier_colors.get(sub.get('tier', 'free'), '🆓')} {sub.get('tier', 'free').title()} Plan**")
     
     if sub.get("active"):
-        st.markdown(f"✅ Active | 💬 {sub.get('remaining_chats', 0)} chats left this month")
+        st.markdown(f"✅ Active | 💬 {sub.get('remaining_today', 0)}/{sub.get('daily_limit', 0)} free actions left today")
         if sub.get("expires_at"):
             st.caption(f"Expires: {sub.get('expires_at')[:10]}")
     else:

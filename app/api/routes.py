@@ -11,6 +11,7 @@ from app.services.generator import generate_answer
 from app.services.weekly_quiz_scheduler import send_quiz_to_single_user, process_weekly_quizzes
 from app.database.models import get_db, User, WeeklyQuiz, WeeklyQuizAttempt
 from app.api.auth_routes import get_current_user
+from app.services.usage_limits import limit_user_action
 from app.utils.config import ADMIN_API_KEY
 
 router = APIRouter(prefix="/api/v1", tags=["general"])
@@ -79,8 +80,7 @@ def ask_question(
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    if current_user.monthly_chats_used >= current_user.monthly_chat_limit:
-        raise HTTPException(status_code=429, detail="Monthly chat limit exceeded.")
+    limit_user_action(current_user)
 
     # Try to retrieve from knowledge base
     try:

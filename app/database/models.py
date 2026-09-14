@@ -255,6 +255,15 @@ class WeeklyQuizAttempt(Base):
     user = relationship("User", backref="weekly_quiz_attempts")
 
 
+class UsageCounter(Base):
+    """Daily usage counters for free-tier limits (scope examples: 'llm:global', 'user:<id>')"""
+    __tablename__ = "usage_counters"
+
+    scope = Column(String, primary_key=True)
+    day = Column(String, primary_key=True)  # UTC date, YYYY-MM-DD
+    count = Column(Integer, nullable=False, default=0)
+
+
 # JWT token functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()

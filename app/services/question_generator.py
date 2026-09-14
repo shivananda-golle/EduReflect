@@ -1,13 +1,8 @@
 import json
-import requests
 import re
-from app.utils.config import HF_API_TOKEN, GENERATOR_MODEL, REQUEST_TIMEOUT
 
-HF_CHAT_URL = "https://router.huggingface.co/v1/chat/completions"
-HEADERS = {
-    "Authorization": f"Bearer {HF_API_TOKEN}",
-    "Content-Type": "application/json"
-}
+from app.services import llm_client
+from app.services.usage_limits import LimitExceeded
 
 def generate_quiz(context: str, num_questions: int = 5):
     system_prompt = (
@@ -39,21 +34,14 @@ IMPORTANT:
 - Ensure the output is valid JSON. Do not include markdown formatting like ```json.
 """
 
-    payload = {
-        "model": GENERATOR_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "max_tokens": 1500,
-        "temperature": 0.5
-    }
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
 
     try:
-        response = requests.post(HF_CHAT_URL, headers=HEADERS, json=payload, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        
+        content = llm_client.chat(messages, max_tokens=1500, temperature=0.5)
+
         # Clean up potential markdown formatting
         content = re.sub(r'```json\s*', '', content)
         content = re.sub(r'```\s*', '', content)
@@ -81,7 +69,9 @@ IMPORTANT:
                 questions = fix_letter_based_answers(questions)
                 return questions
             return []
-            
+
+    except LimitExceeded:
+        raise
     except Exception as e:
         print(f"Error generating quiz: {e}")
         return []

@@ -4,10 +4,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-HF_API_TOKEN = os.getenv("HF_API_TOKEN", "")
+def _env_bool(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in ("1", "true", "yes", "on")
 
-# Models
-GENERATOR_MODEL = os.getenv("GENERATOR_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
+
+# LLM provider: any OpenAI-compatible chat completions endpoint (default: Groq free tier).
+LLM_API_URL = os.getenv("LLM_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+LLM_API_KEY = os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY", "")
+# Tried in order; the next model is used when one is rate-limited (each has its own free quota).
+LLM_MODELS = [m.strip() for m in os.getenv("LLM_MODELS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
+
+# Free-tier protection
+DAILY_LLM_CALL_LIMIT = int(os.getenv("DAILY_LLM_CALL_LIMIT", "500"))      # all users combined
+USER_DAILY_ACTION_LIMIT = int(os.getenv("USER_DAILY_ACTION_LIMIT", "20"))  # questions/quizzes/summaries/uploads per user
+SIGNUPS_PER_IP_PER_HOUR = int(os.getenv("SIGNUPS_PER_IP_PER_HOUR", "3"))
+# Extra LLM call that rewrites each question before retrieval; off by default to halve usage.
+ENABLE_PROMPT_REWRITE = _env_bool("ENABLE_PROMPT_REWRITE", "false")
 
 # Evidence / truncation
 MAX_EVIDENCE_CHARS = int(os.getenv("MAX_EVIDENCE_CHARS", "2000"))

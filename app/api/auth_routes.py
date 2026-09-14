@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 # Remove get_current_user from this import line
 from app.database.models import get_db, User, create_access_token, get_password_hash, verify_token
+from app.services.usage_limits import limit_signups, user_usage
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 
@@ -65,10 +66,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 
+def subscription_info(user: User) -> dict:
+    """Subscription fields plus today's free-tier usage."""
+    return {**user.get_subscription_status(), **user_usage(user.id)}
+
+
 # Routes
 @router.post("/register", response_model=UserResponse)
-def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
+def register_user(user_data: UserCreate, request: Request, db: Session = Depends(get_db)):
     """Register a new user"""
+    limit_signups(request)
+
     # Check if user already exists
     db_user = db.query(User).filter(
         (User.email == user_data.email) | (User.username == user_data.username)
@@ -99,7 +107,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
         email=db_user.email,
         full_name=db_user.full_name,
         preferred_language=db_user.preferred_language,
-        subscription=db_user.get_subscription_status(),
+        subscription=subscription_info(db_user),
         created_at=db_user.created_at.isoformat()
     )
 
@@ -166,7 +174,7 @@ def read_users_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         full_name=current_user.full_name,
         preferred_language=current_user.preferred_language,
-        subscription=current_user.get_subscription_status(),
+        subscription=subscription_info(current_user),
         created_at=current_user.created_at.isoformat()
     )
 
@@ -194,4 +202,4 @@ def update_user_profile(
 @router.get("/subscription/status")
 def get_subscription_status(current_user: User = Depends(get_current_user)):
     """Get user's subscription status"""
-    return current_user.get_subscription_status()
+    return subscription_info(current_user)
