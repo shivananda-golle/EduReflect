@@ -1179,7 +1179,7 @@ else:
                     if st.session_state.show_evidence and msg.get("evidence"):
                         with st.expander("📚 Evidence Used"):
                             for i, chunk in enumerate(msg["evidence"], 1):
-                                st.markdown(f"**Chunk {i}**")
+                                st.markdown(f"**[{i}]**")
                                 st.write(chunk)
                                 st.markdown("---")
                     

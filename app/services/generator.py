@@ -1,3 +1,5 @@
+import json
+
 from app.services import llm_client
 from app.services.usage_limits import LimitExceeded
 from app.utils.config import MAX_EVIDENCE_CHARS
@@ -21,13 +23,28 @@ LENGTH_INSTRUCTIONS = {
 }
 
 
+MAX_TOKENS = {"short": 600, "medium": 800, "long": 1100}
+
+CONFIDENCE = {"full": "High", "partial": "Medium", "none": "Low"}
+
+
+def pack_evidence(documents: list[str], max_chars: int = MAX_EVIDENCE_CHARS) -> str:
+    """Number whole passages ([1], [2], ...) until the character budget is reached, never cutting one mid-way."""
+    parts = []
+    used = 0
+    for i, doc in enumerate(documents, 1):
+        block = f"[{i}] {doc.strip()}"
+        if parts and used + len(block) > max_chars:
+            break
+        parts.append(block[:max_chars])
+        used += len(block) + 2
+    return "\n\n".join(parts)
+
+
 def build_prompt(question: str, documents: list[str], answer_format: str, depth: str, length: str, diagnostic: bool, document_context: str = ""):
-    evidence_text = "\n\n".join(documents)[:MAX_EVIDENCE_CHARS]
-    
-    # If document context is provided, prioritize it over regular evidence
-    if document_context:
-        evidence_text = document_context[:MAX_EVIDENCE_CHARS]
-    
+    # Raw document text (legacy callers) is packed like passages; routes pass selected passages as documents
+    evidence_text = pack_evidence([document_context] if document_context else documents)
+
     format_instruction = FORMAT_INSTRUCTIONS.get(answer_format, FORMAT_INSTRUCTIONS["brief"])
     depth_instruction = DEPTH_INSTRUCTIONS.get(depth, DEPTH_INSTRUCTIONS["standard"])
     length_instruction = LENGTH_INSTRUCTIONS.get(length, LENGTH_INSTRUCTIONS["medium"])
@@ -41,7 +58,7 @@ def build_prompt(question: str, documents: list[str], answer_format: str, depth:
 
     system_prompt = (
         "You are an educational assistant helping students learn new concepts. "
-        "Use only the provided evidence. If information is missing, say so briefly."
+        "Use only the provided evidence. If information is missing, say so briefly. "
         "When answering questions about uploaded documents, provide direct answers without repeating the document content."
     )
 
@@ -49,7 +66,7 @@ def build_prompt(question: str, documents: list[str], answer_format: str, depth:
 Question:
 {question}
 
-Evidence:
+Evidence (numbered passages):
 {evidence_text}
 
 Instruction:
@@ -57,11 +74,17 @@ Instruction:
 {depth_instruction}
 {length_instruction}
 {diag_instruction}
-- Stay grounded in the evidence. If something is missing, say so briefly.
-- Provide 2-3 suggested follow-up questions.
-- Provide 3-6 key terms with one-line definitions (if present in evidence).
-- If evidence is thin, include a one-line caveat at the end.
-- IMPORTANT: Do not repeat or copy large portions of the document content in your answer.
+- Stay grounded in the evidence. Ignore passages that are not relevant to the question.
+- End every sentence that states a fact from the evidence with the number of its passage in square brackets, e.g. [1] or [2][3].
+- If the evidence does not cover part of the question, say so briefly instead of guessing.
+- Write formulas in plain text or Unicode (for example: area = √(s(s−a)(s−b)(s−c)), s = (a+b+c)/2, x²). Never use LaTeX or backslashes.
+- IMPORTANT: Do not repeat or copy large portions of the evidence in your answer.
+
+Return a JSON object with exactly these four keys, in this order:
+- "coverage": exactly one of "full" (the evidence answers the question), "partial" (only in part), or "none" (the evidence does not address it)
+- "answer": the answer as Markdown (formatted as instructed above; no follow-ups or key terms inside it)
+- "key_terms": 3-6 objects {{"term": "...", "definition": "one line"}} taken from the evidence ([] if none)
+- "followups": 2-3 short follow-up questions about the topic that the evidence could help answer
 """
 
     return system_prompt, user_prompt
@@ -76,20 +99,46 @@ def generate_answer(question: str, documents: list[str], answer_format: str = "b
     ]
 
     try:
-        content = llm_client.chat(messages, max_tokens=480, temperature=0.3)
-
-        # Simple heuristics for confidence/caveat; adjust as needed
-        conf = "High" if len("\n\n".join(documents) + document_context) > 500 else "Medium"
-        caveat = "Evidence was brief; consider a more specific question." if len("\n\n".join(documents) + document_context) < 300 else None
-        
-        # For now, leave terms/followups parsing to the UI or future structured prompts
-        terms = []
-        followups = []
-        return content, conf, caveat, terms, followups
+        content = llm_client.chat(
+            messages,
+            max_tokens=MAX_TOKENS.get(length, MAX_TOKENS["medium"]),
+            temperature=0.3,
+            response_format={"type": "json_object"},
+        )
     except LimitExceeded:
         raise
     except Exception as e:
         raise RuntimeError(f"Generation failed: {e}")
+
+    return parse_answer(content)
+
+
+def parse_answer(content: str):
+    """Turn the model's JSON into (answer, confidence, caveat, terms, followups); fall back to raw text."""
+    try:
+        data = json.loads(content)
+        answer = str(data.get("answer") or "").strip()
+    except (json.JSONDecodeError, AttributeError):
+        return content, None, None, [], []
+    if not answer:
+        return content, None, None, [], []
+
+    terms = [
+        f"{t['term']}: {t['definition']}"
+        for t in data.get("key_terms") or []
+        if isinstance(t, dict) and t.get("term") and t.get("definition")
+    ]
+    if terms:
+        answer += "\n\n**Key terms**\n" + "\n".join(f"- **{t.split(': ', 1)[0]}**: {t.split(': ', 1)[1]}" for t in terms)
+
+    followups = [str(f).strip() for f in data.get("followups") or [] if str(f).strip()][:3]
+    coverage = str(data.get("coverage", "")).lower()
+    conf = CONFIDENCE.get(coverage)
+    caveat = {
+        "partial": "The knowledge base only partly covers this question, so parts of the answer may be incomplete.",
+        "none": "The knowledge base doesn't cover this question well. Try rephrasing or asking about a related topic.",
+    }.get(coverage)
+    return answer, conf, caveat, terms, followups
 
 
 def optimize_prompt(raw_question: str) -> str:

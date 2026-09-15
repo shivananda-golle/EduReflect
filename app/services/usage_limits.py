@@ -2,17 +2,22 @@
 Usage limits that keep the public demo inside free-tier quotas.
 
 - Daily counters (global LLM calls, per-user actions) live in the database so they survive restarts.
-- Signup throttling is per client IP and kept in memory.
+- Signup throttling is per client IP (or a shared hourly cap when the IP is unknown) and kept in memory.
 """
+import ipaddress
+import logging
 import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import Request
 
 from app.database.models import SessionLocal, UsageCounter, User
-from app.utils.config import USER_DAILY_ACTION_LIMIT, SIGNUPS_PER_IP_PER_HOUR
+from app.utils.config import SIGNUPS_PER_HOUR_GLOBAL, SIGNUPS_PER_IP_PER_HOUR, USER_DAILY_ACTION_LIMIT
+
+logger = logging.getLogger(__name__)
 
 
 class LimitExceeded(Exception):
@@ -80,28 +85,42 @@ def limit_user_action(current_user: User):
     )
 
 
-def client_ip(request: Request) -> str:
+def client_ip(request: Request) -> Optional[str]:
     """
-    The Streamlit frontend calls the API from its own server, so requests arrive from localhost.
-    It forwards the visitor's IP in X-Client-IP, which is trusted only on loopback connections.
+    The visitor's public IP, or None if it can't be determined.
+
+    The Streamlit frontend calls the API from its own server, so requests arrive from localhost; it forwards
+    the visitor's IP in X-Client-IP, which is trusted only on loopback connections. Private or loopback
+    addresses mean a proxy hid the visitor, so they don't identify anyone.
     """
     peer = request.client.host if request.client else ""
-    if peer in ("127.0.0.1", "::1", "localhost"):
-        return request.headers.get("X-Client-IP") or peer
-    return peer
+    candidate = request.headers.get("X-Client-IP", "") if peer in ("127.0.0.1", "::1", "localhost") else peer
+    try:
+        address = ipaddress.ip_address(candidate.strip())
+    except ValueError:
+        return None
+    return None if address.is_private or address.is_loopback else str(address)
 
 
 _signups = defaultdict(deque)
 _signup_lock = threading.Lock()
+_signup_mode_logged = False
 
 
 def limit_signups(request: Request):
+    """Per-IP sign-up limit when the visitor IP is known; otherwise a shared hourly cap so real visitors aren't blocked."""
+    global _signup_mode_logged
     ip = client_ip(request)
+    key, limit = (f"ip:{ip}", SIGNUPS_PER_IP_PER_HOUR) if ip else ("global", SIGNUPS_PER_HOUR_GLOBAL)
+    if not _signup_mode_logged:
+        logger.info("Sign-up limiting mode: %s", "per visitor IP" if ip else "shared hourly cap (visitor IP unavailable)")
+        _signup_mode_logged = True
+
     now = time.monotonic()
     with _signup_lock:
-        window = _signups[ip]
+        window = _signups[key]
         while window and now - window[0] > 3600:
             window.popleft()
-        if len(window) >= SIGNUPS_PER_IP_PER_HOUR:
-            raise LimitExceeded("Too many sign-ups from your network. Please try again in an hour.")
+        if len(window) >= limit:
+            raise LimitExceeded("Too many sign-ups right now. Please try again in an hour.")
         window.append(now)

@@ -6,12 +6,12 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-# from app.services.kb_retriever import retrieve_from_kb  # Commented out to avoid torch import issues
 from app.services.generator import generate_answer
+from app.services.kb_retriever import retrieve_from_kb
 from app.services.weekly_quiz_scheduler import send_quiz_to_single_user, process_weekly_quizzes
 from app.database.models import get_db, User, WeeklyQuiz, WeeklyQuizAttempt
 from app.api.auth_routes import get_current_user
-from app.services.usage_limits import limit_user_action
+from app.services.usage_limits import LimitExceeded, limit_user_action
 from app.utils.config import ADMIN_API_KEY
 
 router = APIRouter(prefix="/api/v1", tags=["general"])
@@ -82,13 +82,8 @@ def ask_question(
 
     limit_user_action(current_user)
 
-    # Try to retrieve from knowledge base
-    try:
-        from app.services.kb_retriever import retrieve_from_kb
-        documents = retrieve_from_kb(question, top_k=5)
-    except ImportError:
-        documents = []
-    
+    documents = retrieve_from_kb(question, top_k=5)
+
     if not documents:
         return AnswerResponse(
             question=question,
@@ -109,6 +104,8 @@ def ask_question(
             length=payload.length,
             diagnostic=payload.diagnostic,
         )
+    except LimitExceeded:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
 

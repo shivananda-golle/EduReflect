@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.database.models import User, Chat, Message, SessionLocal, WeeklyQuiz
 from app.services.question_generator import generate_quiz
 from app.services.email_service import send_email, format_quiz_link_email
+from app.utils.config import APP_URL
 
 logger = logging.getLogger(__name__)
 
@@ -162,9 +163,8 @@ def send_weekly_quiz_email(user: User, quiz_id: str, db: Session) -> bool:
         logger.error(f"Quiz {quiz_id} not found")
         return False
     
-    # Create quiz link (assuming frontend URL structure)
-    base_url = "http://localhost:8501"  # Update this for production
-    quiz_link = f"{base_url}/?quiz={quiz_id}"
+    # Create quiz link to the public frontend
+    quiz_link = f"{APP_URL.rstrip('/')}/?quiz={quiz_id}"
     
     # Format expiry date
     expiry_str = quiz.expires_at.strftime("%B %d, %Y") if quiz.expires_at else None

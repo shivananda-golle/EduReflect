@@ -42,9 +42,9 @@ data/*
 !data/index/
 
 # Ad-hoc local test/scratch files
-test*.py
-send_test_quiz.py
-zzzzz.txt
+/test*.py
+/send_test_quiz.py
+/zzzzz.txt
 
 # Binary docs
 *.pdf

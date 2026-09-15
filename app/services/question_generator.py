@@ -9,29 +9,35 @@ def generate_quiz(context: str, num_questions: int = 5):
         "You are an educational assistant. Your task is to generate a quiz to test the user's understanding of the provided text. "
         "Return the output strictly in JSON format."
     )
-    
+
+    # Citation markers like [2] and the key-terms list are answer formatting, not quiz material
+    context = re.sub(r"\[\d+\]", "", context)
+
     user_prompt = f"""
 Based on the following content, generate {num_questions} multiple-choice questions to test the user's understanding.
 The questions should vary in difficulty (easy, medium, hard).
 
 Content:
-{context[:2000]}
+{context[:3000]}
 
-Output Format (JSON Array):
-[
-  {{
-    "question": "Question text here",
-    "options": ["First option text", "Second option text", "Third option text", "Fourth option text"],
-    "correct_answer": "First option text",
-    "explanation": "Why this answer is correct",
-    "difficulty": "medium"
-  }}
-]
+Output Format (JSON object):
+{{
+  "questions": [
+    {{
+      "question": "Question text here",
+      "options": ["First option text", "Second option text", "Third option text", "Fourth option text"],
+      "correct_answer": "First option text",
+      "explanation": "Why this answer is correct",
+      "difficulty": "medium"
+    }}
+  ]
+}}
 
-IMPORTANT: 
+IMPORTANT:
+- Each question has exactly 4 different options, and exactly one of them is correct.
 - The "correct_answer" field MUST contain the EXACT FULL TEXT of the correct option, NOT a letter like "A", "B", "C", or "D".
-- The correct_answer must exactly match one of the options in the options array.
-- Ensure the output is valid JSON. Do not include markdown formatting like ```json.
+- Questions must be answerable from the content; don't refer to "the text" or "the passage".
+- Write formulas in plain text or Unicode (e.g. √(s(s−a)), x²), never LaTeX.
 """
 
     messages = [
@@ -40,7 +46,7 @@ IMPORTANT:
     ]
 
     try:
-        content = llm_client.chat(messages, max_tokens=1500, temperature=0.5)
+        content = llm_client.chat(messages, max_tokens=1800, temperature=0.5, response_format={"type": "json_object"})
 
         # Clean up potential markdown formatting
         content = re.sub(r'```json\s*', '', content)
@@ -58,16 +64,14 @@ IMPORTANT:
                 return []
             
             # Post-process: Fix letter-based answers (A, B, C, D) to actual option text
-            questions = fix_letter_based_answers(questions)
-            return questions
-            
+            return validate_questions(fix_letter_based_answers(questions))
+
         except json.JSONDecodeError:
             # Fallback: try to find JSON array in text
             match = re.search(r'\[.*\]', content, re.DOTALL)
             if match:
                 questions = _loads_lenient(match.group(0))
-                questions = fix_letter_based_answers(questions)
-                return questions
+                return validate_questions(fix_letter_based_answers(questions))
             return []
 
     except LimitExceeded:
@@ -75,6 +79,26 @@ IMPORTANT:
     except Exception as e:
         print(f"Error generating quiz: {e}")
         return []
+
+
+def validate_questions(questions: list) -> list:
+    """Keep only well-formed questions: text, 2+ distinct options, and a correct answer that is one of them."""
+    valid = []
+    seen = set()
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        text = str(q.get("question", "")).strip()
+        options = [str(o).strip() for o in q.get("options") or [] if str(o).strip()]
+        options = list(dict.fromkeys(options))
+        answer = str(q.get("correct_answer", "")).strip()
+        if not text or text.lower() in seen or len(options) < 2 or answer not in options:
+            continue
+        seen.add(text.lower())
+        q["options"] = options
+        q["correct_answer"] = answer
+        valid.append(q)
+    return valid
 
 
 def _loads_lenient(text: str):

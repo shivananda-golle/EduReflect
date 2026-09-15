@@ -17,20 +17,28 @@ LLM_API_URL = os.getenv("LLM_API_URL", "https://api.groq.com/openai/v1/chat/comp
 LLM_API_KEY = os.getenv("LLM_API_KEY") or os.getenv("GROQ_API_KEY", "")
 # Tried in order; the next model is used when one is rate-limited (each has its own free quota).
 LLM_MODELS = [m.strip() for m in os.getenv("LLM_MODELS", "openai/gpt-oss-20b,qwen/qwen3.8-27b").split(",") if m.strip()]
+# When every model is rate-limited, wait up to this many seconds (from Retry-After) and retry once
+LLM_MAX_RETRY_WAIT = float(os.getenv("LLM_MAX_RETRY_WAIT", "10"))
 
 # Free-tier protection
 DAILY_LLM_CALL_LIMIT = int(os.getenv("DAILY_LLM_CALL_LIMIT", "500"))      # all users combined
 USER_DAILY_ACTION_LIMIT = int(os.getenv("USER_DAILY_ACTION_LIMIT", "20"))  # questions/quizzes/summaries/uploads per user
 SIGNUPS_PER_IP_PER_HOUR = int(os.getenv("SIGNUPS_PER_IP_PER_HOUR", "3"))
+# Used instead when the visitor IP is unknown (e.g. hidden by a hosting proxy)
+SIGNUPS_PER_HOUR_GLOBAL = int(os.getenv("SIGNUPS_PER_HOUR_GLOBAL", "30"))
 # Extra LLM call that rewrites each question before retrieval; off by default to halve usage.
 ENABLE_PROMPT_REWRITE = _env_bool("ENABLE_PROMPT_REWRITE", "false")
 
 # Retrieval: the index in data/index must be built with this same embedding model
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 INDEX_DIR = PROJECT_ROOT / "data" / "index"
+# dense | bm25 | hybrid | hybrid_rerank (see eval/evaluate_retrieval.py for measurements)
+RETRIEVAL_MODE = os.getenv("RETRIEVAL_MODE", "hybrid")
+RETRIEVAL_CANDIDATES = int(os.getenv("RETRIEVAL_CANDIDATES", "10"))
+RERANKER_MODEL = os.getenv("RERANKER_MODEL", "Xenova/ms-marco-MiniLM-L-6-v2")
 
 # Evidence / truncation
-MAX_EVIDENCE_CHARS = int(os.getenv("MAX_EVIDENCE_CHARS", "2000"))
+MAX_EVIDENCE_CHARS = int(os.getenv("MAX_EVIDENCE_CHARS", "4500"))
 
 # Request timeouts (seconds)
 # HF generation + first-time downloads can exceed 30s on some machines/networks.
@@ -45,6 +53,9 @@ for _prefix in ("postgres://", "postgresql://"):
 
 # JWT signing key. Set a long random value in production (e.g. `python -c "import secrets; print(secrets.token_hex(32))"`).
 SECRET_KEY = os.getenv("SECRET_KEY", "")
+
+# Public URL of the Streamlit app, used in emailed quiz links
+APP_URL = os.getenv("APP_URL", "http://localhost:8501")
 
 # Browser origins allowed to call the API (comma-separated). Streamlit calls the API
 # server-side, so it does not need an entry; only add origins for browser-based clients.

@@ -9,6 +9,9 @@ from app.database.models import init_db
 from app.services.usage_limits import LimitExceeded
 from app.utils.config import CORS_ORIGINS
 
+# App loggers (e.g. sign-up limiting mode, LLM rate limits) print at INFO; no-op if logging is already configured
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
 app = FastAPI(title="EduReflect API", version="1.0.0")
 
 app.add_middleware(

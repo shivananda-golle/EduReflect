@@ -1,5 +1,7 @@
 # EduReflect
 
+[![tests](https://github.com/shivananda-golle/EduReflect/actions/workflows/tests.yml/badge.svg)](https://github.com/shivananda-golle/EduReflect/actions/workflows/tests.yml)
+
 An AI-powered study assistant. EduReflect answers students' questions from a curated science and maths knowledge base using Retrieval-Augmented Generation (RAG), turns conversations into quizzes, tracks concept mastery, and answers questions about uploaded PDFs and DOCX files.
 
 > **Stack:** FastAPI · Streamlit · SQLAlchemy (SQLite / Postgres) · FAISS + fastembed (`BAAI/bge-small-en-v1.5`, ONNX) · Groq (OpenAI-compatible LLM API) · APScheduler
@@ -10,10 +12,10 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 
 ## Features
 
-- **Grounded answers (RAG)**: questions are embedded with bge-small, matched against a FAISS index of 2,316 passages, and answered by an LLM using only the retrieved evidence, which is shown alongside the answer.
+- **Grounded, cited answers (RAG)**: hybrid retrieval (bge-small embeddings + BM25 keyword search) over 2,316 passages; the LLM answers only from the numbered evidence, cites passages like [1], reports how well the evidence covers the question, and suggests follow-up questions and key terms.
 - **Configurable response style**: format (brief / bullets / presentation), depth (kid / standard / exam), and length (short / medium / long), plus optional diagnostic questions.
 - **Quizzes and mastery tracking**: generate a 5-question multiple-choice quiz from any answer; results update per-concept mastery levels.
-- **Document Q&A**: upload a PDF or DOCX, get a summary, and ask questions about it.
+- **Document Q&A**: upload a PDF or DOCX, get a summary sampled from the whole file, and ask questions answered from its most relevant sections.
 - **Study workspace**: multi-turn chats grouped into projects, pinning, search, message editing with history, chat summaries, and PDF export.
 - **Weekly quiz emails** (optional): a scheduled job builds a personalised quiz from each user's recent chats and emails a link.
 - **Runs entirely on free tiers**: no PyTorch (the whole app peaks at ~380 MB RAM), plus a global daily LLM budget, per-user daily limits, and sign-up throttling keep a public demo within free quotas.
@@ -33,13 +35,34 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
                          ▼                                     ▼                             ▼
                ┌───────────────────┐             ┌───────────────────────┐     ┌───────────────────────┐
                │  SQLite/Postgres  │             │  kb_retriever         │     │  llm_client           │
-               │  users, chats,    │             │  bge-small (ONNX) +   │     │  Groq free tier       │
-               │  quizzes, usage   │             │  FAISS (data/index/)  │     │  daily budget +       │
-               │  counters         │             │                       │     │  model fallback       │
+               │  users, chats,    │             │  bge-small + FAISS    │     │  Groq free tier       │
+               │  quizzes, usage   │             │  + BM25, fused (RRF)  │     │  daily budget, retry, │
+               │  counters         │             │  (data/index/)        │     │  model fallback       │
                └───────────────────┘             └───────────────────────┘     └───────────────────────┘
 ```
 
-**Request flow for a question:** retrieve the top 5 passages from FAISS → build a grounded prompt (style, depth, length) → one LLM call through `llm_client` → store the answer and its evidence in the chat.
+**Request flow for a question:** dense (FAISS) and BM25 searches each return 10 candidates → reciprocal rank fusion picks the top 5 → whole passages are numbered into a grounded prompt (style, depth, length) → one JSON-mode LLM call through `llm_client` → the cited answer, key terms, follow-ups, and evidence are stored in the chat.
+
+---
+
+## Evaluation
+
+Retrieval is measured on 75 questions generated from random knowledge-base passages (`eval/retrieval_questions.json`): does search return the passage the question was written from?
+
+| Mode | hit@1 | hit@5 | MRR@10 | Latency |
+| --- | --- | --- | --- | --- |
+| Dense (bge-small) | 73.3% | 93.3% | 0.823 | ~18 ms |
+| BM25 | 82.7% | 94.7% | 0.884 | ~1 ms |
+| **Hybrid (default)** | **82.7%** | **97.3%** | **0.885** | ~21 ms |
+| Hybrid + cross-encoder rerank | 90.7% | 98.7% | 0.937 | ~1,100 ms |
+
+The reranker (`RETRIEVAL_MODE=hybrid_rerank`) is the most accurate but too slow for free shared CPUs; since the LLM reads all top-5 passages, hybrid's hit@5 captures most of the benefit. Questions are synthetic, which slightly favours keyword matching.
+
+```bash
+python -m eval.evaluate_retrieval            # reproduce the table
+python -m eval.generate_questions --n 80     # regenerate the question set (uses the LLM)
+pytest -q                                    # tests, including a retrieval-quality floor
+```
 
 ---
 
@@ -60,11 +83,11 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 │   │   ├── llm_client.py          # single entry point for LLM calls
 │   │   ├── usage_limits.py        # daily budgets, per-user and sign-up limits
 │   │   ├── kb_builder.py          # build the FAISS index from data/clean/
-│   │   ├── kb_retriever.py        # query the FAISS index
+│   │   ├── kb_retriever.py        # hybrid retrieval: FAISS + BM25 (+ optional reranker)
 │   │   ├── generator.py           # grounded answer prompt
 │   │   ├── question_generator.py  # quiz generation (JSON)
 │   │   ├── summarizer.py          # chat summaries
-│   │   ├── document_processor.py  # PDF/DOCX extraction + Q&A
+│   │   ├── document_processor.py  # PDF/DOCX extraction, relevant-section Q&A, summaries
 │   │   ├── concept_tracker.py     # mastery tracking
 │   │   ├── weekly_quiz_scheduler.py
 │   │   └── email_service.py       # SMTP sender
@@ -76,7 +99,8 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 │   └── embedded_backend.py        # optional: run the API inside the Streamlit process
 ├── data/index/                    # prebuilt FAISS index + passage metadata
 ├── scripts/                       # knowledge-base preparation (PDF → text, Wikipedia, cleaning)
-├── alembic/                       # historical migrations (tables are created on startup)
+├── eval/                          # retrieval evaluation set and scripts
+├── tests/                         # pytest suite (fake LLM, temporary SQLite)
 ├── requirements.txt
 └── .env.example
 ```
@@ -185,7 +209,8 @@ Every LLM call goes through `app/services/llm_client.py`, which makes a public d
 | --- | --- | --- |
 | LLM calls per day (all users) | 500 | `DAILY_LLM_CALL_LIMIT` |
 | Actions per user per day (questions, quizzes, summaries, uploads) | 20 | `USER_DAILY_ACTION_LIMIT` |
-| Sign-ups per IP per hour | 3 | `SIGNUPS_PER_IP_PER_HOUR` |
+| Sign-ups per IP per hour (shared cap if the IP is hidden by a proxy) | 3 (30) | `SIGNUPS_PER_IP_PER_HOUR` (`SIGNUPS_PER_HOUR_GLOBAL`) |
+| Short wait-and-retry when every model is rate-limited | ≤ 10 s | `LLM_MAX_RETRY_WAIT` |
 | Model fallback on rate limit | `gpt-oss-20b` → `qwen3.8-27b` | `LLM_MODELS` |
 | Prompt-rewrite pre-call | off | `ENABLE_PROMPT_REWRITE` |
 
@@ -238,17 +263,22 @@ The full schema is at `/docs` once the backend is running.
 | `DATABASE_URL` | SQLite file in the project root | Any SQLAlchemy URL; `postgresql://` URLs use psycopg 3 |
 | `EMBEDDED_BACKEND` | `false` | Run the API inside the Streamlit process (single-process hosting) |
 | `EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | fastembed model; must match the index |
+| `RETRIEVAL_MODE` | `hybrid` | `dense`, `bm25`, `hybrid`, or `hybrid_rerank` |
+| `RETRIEVAL_CANDIDATES` | `10` | Candidates per search before fusion/reranking |
+| `RERANKER_MODEL` | `Xenova/ms-marco-MiniLM-L-6-v2` | Cross-encoder for `hybrid_rerank` |
 | `LLM_API_URL` | Groq chat completions URL | Any OpenAI-compatible endpoint |
 | `LLM_MODELS` | `openai/gpt-oss-20b,qwen/qwen3.8-27b` | Models, tried in order |
 | `DAILY_LLM_CALL_LIMIT` | `500` | Global LLM calls per day |
 | `USER_DAILY_ACTION_LIMIT` | `20` | Per-user actions per day |
-| `SIGNUPS_PER_IP_PER_HOUR` | `3` | Sign-up throttling |
+| `SIGNUPS_PER_IP_PER_HOUR` / `SIGNUPS_PER_HOUR_GLOBAL` | `3` / `30` | Sign-up throttling (per visitor IP / when the IP is unknown) |
+| `LLM_MAX_RETRY_WAIT` | `10` | Max seconds to wait for a rate limit to reset before retrying |
+| `APP_URL` | `http://localhost:8501` | Public app URL used in quiz emails |
 | `ENABLE_PROMPT_REWRITE` | `false` | Rewrite questions with an extra LLM call |
 | `SECRET_KEY` | random per process | JWT signing key |
 | `ADMIN_API_KEY` | *(empty = disabled)* | Key for admin email endpoints |
 | `CORS_ORIGINS` | `http://localhost:8501,http://localhost:3000` | Allowed browser origins |
 | `MAX_UPLOAD_MB` | `10` | Upload size limit |
-| `MAX_EVIDENCE_CHARS` | `2000` | Evidence passed to the LLM |
+| `MAX_EVIDENCE_CHARS` | `4500` | Evidence budget (whole passages) passed to the LLM |
 | `REQUEST_TIMEOUT` | `120.0` | LLM HTTP timeout (seconds) |
 | `BACKEND_URL` | `http://localhost:8000` | Backend URL used by Streamlit |
 | `DEFAULT_API_TIMEOUT` / `LONG_API_TIMEOUT` | `30` / `300` | Frontend → backend timeouts |
@@ -261,8 +291,7 @@ The full schema is at `/docs` once the backend is running.
 ## Roadmap
 
 - Answer verification: check each generated sentence against the evidence and rewrite unsupported claims.
-- Structured output for key terms and follow-up questions.
-- Evaluation harness for retrieval and answer quality.
+- Answer-quality evaluation (faithfulness to evidence, citation accuracy) alongside the retrieval benchmark.
 
 ---
 

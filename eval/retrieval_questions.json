@@ -1,0 +1,377 @@
+[
+  {
+    "question": "Why did Mendel find that some F2 plants were short even though all F1 plants were tall?",
+    "chunk_id": 907,
+    "source": "jesc108.txt"
+  },
+  {
+    "question": "How did Kepler’s elliptical orbits help predict planetary transits?",
+    "chunk_id": 2268,
+    "source": "solar_system.txt"
+  },
+  {
+    "question": "What causes the green coating on copper and the black coating on silver?",
+    "chunk_id": 540,
+    "source": "jesc101.txt"
+  },
+  {
+    "question": "What happens to the current when you replace the nichrome wire with a torch bulb in the circuit?",
+    "chunk_id": 1061,
+    "source": "jesc111.txt"
+  },
+  {
+    "question": "Why does the center of mass of a closed system not accelerate when only internal forces act?",
+    "chunk_id": 1623,
+    "source": "force.txt"
+  },
+  {
+    "question": "What are some everyday examples where congruent shapes are used, and which figures in Fig. 7.3 are not congruent to the square?",
+    "chunk_id": 193,
+    "source": "iemh107.txt"
+  },
+  {
+    "question": "Why does any angle subtended by a diameter of a circle measure 90°, and what does the converse theorem say about points on a circle?",
+    "chunk_id": 279,
+    "source": "iemh109.txt"
+  },
+  {
+    "question": "Which branches of physics are commonly applied in astrophysics, and why are space-based observations necessary for certain wavelengths?",
+    "chunk_id": 1994,
+    "source": "physics.txt"
+  },
+  {
+    "question": "What are the main areas studied in chemistry, and how does nuclear chemistry differ from organic chemistry?",
+    "chunk_id": 1374,
+    "source": "chemistry.txt"
+  },
+  {
+    "question": "How can you prove that a bill has been paid if the electricity department claims it hasn't?",
+    "chunk_id": 366,
+    "source": "iemh1a1.txt"
+  },
+  {
+    "question": "How do you calculate the power of a concave lens if you know its focal length is 2 meters?",
+    "chunk_id": 1000,
+    "source": "jesc109.txt"
+  },
+  {
+    "question": "Which tectonic plate is moving the fastest, and what is its approximate speed in millimeters per year?",
+    "chunk_id": 1481,
+    "source": "earth.txt"
+  },
+  {
+    "question": "In the proof that a diagonal splits a parallelogram into two congruent triangles, which specific angle pairs are identified as alternate angles?",
+    "chunk_id": 232,
+    "source": "iemh108.txt"
+  },
+  {
+    "question": "null",
+    "chunk_id": 2189,
+    "source": "scientific_method.txt"
+  },
+  {
+    "question": "According to the text, how does the fundamental theorem of calculus allow for the computation of definite integrals without using limit processes?",
+    "chunk_id": 1316,
+    "source": "calculus.txt"
+  },
+  {
+    "question": "How can synthetic diamonds be made and how do they compare to natural diamonds?",
+    "chunk_id": 680,
+    "source": "jesc104.txt"
+  },
+  {
+    "question": "What is the correct statement about the number of lines that can pass through a single point?",
+    "chunk_id": 159,
+    "source": "iemh105.txt"
+  },
+  {
+    "question": "If 27 iron spheres are melted into one sphere, how does the new sphere’s radius and surface area compare to the originals?",
+    "chunk_id": 337,
+    "source": "iemh111.txt"
+  },
+  {
+    "question": "What are examples of herbivores, carnivores, omnivores, and parasites?",
+    "chunk_id": 1160,
+    "source": "jesc113.txt"
+  },
+  {
+    "question": "How can you determine the direction of the magnetic field around a straight current‑carrying wire using a compass?",
+    "chunk_id": 1127,
+    "source": "jesc112.txt"
+  },
+  {
+    "question": "If a line cuts two concentric circles at points A, B on the first and C, D on the second, why must AB equal CD?",
+    "chunk_id": 272,
+    "source": "iemh109.txt"
+  },
+  {
+    "question": "Why do biologists say that invisible molecular movement is necessary for life?",
+    "chunk_id": 734,
+    "source": "jesc105.txt"
+  },
+  {
+    "question": "How do you construct the frequency polygon from the histogram in Fig. 12.3?",
+    "chunk_id": 351,
+    "source": "iemh112.txt"
+  },
+  {
+    "question": "What are the limits of validity for classical mechanics compared to quantum mechanics?",
+    "chunk_id": 1410,
+    "source": "classical_mechanics.txt"
+  },
+  {
+    "question": "How does changing the direction of the magnetic field affect the force on a current‑carrying rod?",
+    "chunk_id": 1140,
+    "source": "jesc112.txt"
+  },
+  {
+    "question": "Who was the first person to develop a mathematically predictive heliocentric system?",
+    "chunk_id": 2267,
+    "source": "solar_system.txt"
+  },
+  {
+    "question": "How do you name a straight‑chain alcohol with three carbons and a hydroxyl group?",
+    "chunk_id": 698,
+    "source": "jesc104.txt"
+  },
+  {
+    "question": "What is the relationship between the energy of a photon and its frequency?",
+    "chunk_id": 1580,
+    "source": "energy.txt"
+  },
+  {
+    "question": "What happens to the chemical energy of nutrients that is not used for ATP production?",
+    "chunk_id": 1573,
+    "source": "energy.txt"
+  },
+  {
+    "question": "Why is the segment joining the midpoints of two sides of a triangle parallel to the third side?",
+    "chunk_id": 249,
+    "source": "iemh108.txt"
+  },
+  {
+    "question": "Which event 66 million years ago caused the extinction of non‑avian dinosaurs?",
+    "chunk_id": 1469,
+    "source": "earth.txt"
+  },
+  {
+    "question": "What physical process inside the Earth's core is responsible for generating the planet's main magnetic field?",
+    "chunk_id": 1487,
+    "source": "earth.txt"
+  },
+  {
+    "question": "Based on the experiment with nichrome wires, how does doubling the length of a conductor affect the current flowing through it?",
+    "chunk_id": 1065,
+    "source": "jesc111.txt"
+  },
+  {
+    "question": "What specific combination of side and angle equalities is sufficient to prove that two triangles are congruent?",
+    "chunk_id": 198,
+    "source": "iemh107.txt"
+  },
+  {
+    "question": "How does the presence of a specific functional group, like an alcohol group, influence the properties of a carbon compound?",
+    "chunk_id": 693,
+    "source": "jesc104.txt"
+  },
+  {
+    "question": "What are the three main components that make up a triangle, and what does the prefix 'tri' signify in this context?",
+    "chunk_id": 190,
+    "source": "iemh107.txt"
+  },
+  {
+    "question": "Where can I find free video lectures and course materials for classical mechanics, specifically from MIT?",
+    "chunk_id": 1425,
+    "source": "classical_mechanics.txt"
+  },
+  {
+    "question": "Why do we experience quantum events as random if the multiverse theory suggests the entire system is deterministic?",
+    "chunk_id": 2083,
+    "source": "quantum_mechanics.txt"
+  },
+  {
+    "question": "Who were the key advisors and committee members responsible for developing this science and mathematics textbook?",
+    "chunk_id": 494,
+    "source": "iemh1ps.txt"
+  },
+  {
+    "question": "Why is it beneficial for the body to use chemical signals in addition to electrical nerve impulses when preparing for sudden actions like fighting or running?",
+    "chunk_id": 836,
+    "source": "jesc106.txt"
+  },
+  {
+    "question": "How does the strength of the magnetic field around a straight wire change as you move further away from it, and what rule helps determine its direction?",
+    "chunk_id": 1129,
+    "source": "jesc112.txt"
+  },
+  {
+    "question": "What happens to the color and smell of ferrous sulphate crystals when they are heated, and what type of chemical reaction is this?",
+    "chunk_id": 526,
+    "source": "jesc101.txt"
+  },
+  {
+    "question": "How does Noether's theorem relate conservation laws to symmetries, and what are the main categories of mechanics based on their region of application?",
+    "chunk_id": 1386,
+    "source": "classical_mechanics.txt"
+  },
+  {
+    "question": "If two cars start from points A and B which are 100 km apart, traveling towards each other at 40 km/h and 30 km/h respectively, how long will it take for them to meet?",
+    "chunk_id": 434,
+    "source": "iemh1a2.txt"
+  },
+  {
+    "question": "According to the passage, when did humans first emerge, and how has their impact on the planet's environment affected the biosphere?",
+    "chunk_id": 1457,
+    "source": "earth.txt"
+  },
+  {
+    "question": "After cross-pollination occurs, what steps does the pollen grain take to reach the ovary, and how do the ovule and ovary change after fertilization?",
+    "chunk_id": 874,
+    "source": "jesc107.txt"
+  },
+  {
+    "question": "What is the difference between an ordinary differential equation and a partial differential equation?",
+    "chunk_id": 1433,
+    "source": "differential_equations.txt"
+  },
+  {
+    "question": "How did the understanding of electricity and magnetism evolve into the concept of electromagnetism?",
+    "chunk_id": 1984,
+    "source": "physics.txt"
+  },
+  {
+    "question": "What factors contributed to the rise of 'big science' after World War II?",
+    "chunk_id": 1689,
+    "source": "history_of_science.txt"
+  },
+  {
+    "question": "What happens to the appearance of pure metals when their surfaces are cleaned with sandpaper?",
+    "chunk_id": 607,
+    "source": "jesc103.txt"
+  },
+  {
+    "question": "Why do we need to accept some statements as true instead of all statements that seem self‑evident?",
+    "chunk_id": 392,
+    "source": "iemh1a1.txt"
+  },
+  {
+    "question": "What are the three types of boundaries where tectonic plates interact, and what happens at each one?",
+    "chunk_id": 1479,
+    "source": "earth.txt"
+  },
+  {
+    "question": "How does the local conservation of energy differ from the global law, and what mathematical principle explains why energy is conserved?",
+    "chunk_id": 1597,
+    "source": "energy.txt"
+  },
+  {
+    "question": "In the anodising process, what chemical reaction occurs at the anode to create a protective layer on aluminium?",
+    "chunk_id": 621,
+    "source": "jesc103.txt"
+  },
+  {
+    "question": "What is the standard distance for the near point of a normal young adult's eye, and what is the far point?",
+    "chunk_id": 1014,
+    "source": "jesc110.txt"
+  },
+  {
+    "question": "What is a counter-example, and how does the number 9 demonstrate that the statement 'every odd number greater than 1 is prime' is false?",
+    "chunk_id": 375,
+    "source": "iemh1a1.txt"
+  },
+  {
+    "question": "Why do the forces between two objects have to be equal and opposite and act along the line that connects them?",
+    "chunk_id": 1401,
+    "source": "classical_mechanics.txt"
+  },
+  {
+    "question": "What is the main difference between an Ijazah and a western university degree?",
+    "chunk_id": 1751,
+    "source": "history_of_science.txt"
+  },
+  {
+    "question": "In a trapezium with AB parallel to DC, why does the line through the midpoint of AD that is parallel to AB meet BC at its midpoint?",
+    "chunk_id": 254,
+    "source": "iemh108.txt"
+  },
+  {
+    "question": "How many constants appear in the general solution of an nth‑order ordinary differential equation?",
+    "chunk_id": 1441,
+    "source": "differential_equations.txt"
+  },
+  {
+    "question": "What can we conclude about the diagonals of a quadrilateral if each pair of opposite angles is equal?",
+    "chunk_id": 236,
+    "source": "iemh108.txt"
+  },
+  {
+    "question": "What was the first time the term \"energy\" was used in its modern sense and who coined it?",
+    "chunk_id": 1555,
+    "source": "energy.txt"
+  },
+  {
+    "question": "Why do non-metals not conduct electricity well, and which non-metal is an exception?",
+    "chunk_id": 661,
+    "source": "jesc103.txt"
+  },
+  {
+    "question": "How did mathematicians eventually avoid using infinitesimals in calculus?",
+    "chunk_id": 1290,
+    "source": "calculus.txt"
+  },
+  {
+    "question": "Which ancient civilizations first contributed to mathematics, astronomy, and medicine that later influenced Greek natural philosophy?",
+    "chunk_id": 1686,
+    "source": "history_of_science.txt"
+  },
+  {
+    "question": "Who is considered the \"father of modern metallurgy\" and what was his major contribution?",
+    "chunk_id": 1365,
+    "source": "chemistry.txt"
+  },
+  {
+    "question": "Why is an earth wire used for appliances with metal bodies?",
+    "chunk_id": 1146,
+    "source": "jesc112.txt"
+  },
+  {
+    "question": "How does the mass of a falling object affect its acceleration due to gravity?",
+    "chunk_id": 1897,
+    "source": "newton's_laws_of_motion.txt"
+  },
+  {
+    "question": "What role does the placenta play in supplying nutrients to a developing embryo?",
+    "chunk_id": 886,
+    "source": "jesc107.txt"
+  },
+  {
+    "question": "How do enzymes help reduce the activation energy of metabolic reactions?",
+    "chunk_id": 1227,
+    "source": "biology.txt"
+  },
+  {
+    "question": "Why is the Sun classified as a G2-type main‑sequence star?",
+    "chunk_id": 2218,
+    "source": "solar_system.txt"
+  },
+  {
+    "question": "How does the path of a light ray change after it passes through a convex lens if it was originally traveling parallel to the principal axis?",
+    "chunk_id": 988,
+    "source": "jesc109.txt"
+  },
+  {
+    "question": "What is the difference in how Leishmania and Plasmodium reproduce compared to Amoeba?",
+    "chunk_id": 856,
+    "source": "jesc107.txt"
+  },
+  {
+    "question": "How does Paramoecium use its cilia to bring food to a specific location for digestion?",
+    "chunk_id": 750,
+    "source": "jesc105.txt"
+  },
+  {
+    "question": "Why is it impossible to accelerate a massive body to the speed of light according to special relativity?",
+    "chunk_id": 1938,
+    "source": "newton's_laws_of_motion.txt"
+  }
+]

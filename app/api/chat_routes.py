@@ -3,19 +3,20 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import os
 import tempfile
 
 from app.database.models import get_db, Chat, Message, MessageEditHistory, Project, User
 from app.api.auth_routes import get_current_user
-# from app.services.kb_retriever import retrieve_from_kb  # Commented out to avoid torch import issues
 from app.services.generator import generate_answer, optimize_prompt
 from app.services.summarizer import generate_chat_summary
-from app.services.document_processor import process_document
+from app.services.document_processor import process_document, select_relevant_passages
+from app.services.kb_retriever import retrieve_from_kb
 from app.services.question_generator import generate_quiz
 from app.services.concept_tracker import update_user_progress, get_user_mastery
-from app.services.usage_limits import limit_user_action
+from app.services.usage_limits import LimitExceeded, limit_user_action
 from app.utils.config import MAX_UPLOAD_MB, ENABLE_PROMPT_REWRITE
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
@@ -75,12 +76,19 @@ def create_project(
 @router.get("/projects")
 def list_projects(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     projects = db.query(Project).filter(Project.user_id == current_user.id).order_by(Project.updated_at.desc()).all()
+    # One grouped count instead of loading every project's chats (a query per project on a remote DB)
+    chat_counts = dict(
+        db.query(Chat.project_id, func.count(Chat.id))
+        .filter(Chat.project_id.in_([p.id for p in projects]))
+        .group_by(Chat.project_id)
+        .all()
+    ) if projects else {}
     return [
         {
             "id": p.id,
             "name": p.name,
             "description": p.description,
-            "chat_count": len(p.chats),
+            "chat_count": chat_counts.get(p.id, 0),
             "updated_at": p.updated_at.isoformat()
         }
         for p in projects
@@ -131,7 +139,14 @@ def list_chats(
     
     chats = query.order_by(Chat.is_pinned.desc(), Chat.updated_at.desc())\
                  .offset(offset).limit(limit).all()
-    
+    # One grouped count instead of loading every chat's messages
+    message_counts = dict(
+        db.query(Message.chat_id, func.count(Message.id))
+        .filter(Message.chat_id.in_([c.id for c in chats]))
+        .group_by(Message.chat_id)
+        .all()
+    ) if chats else {}
+
     return [
         {
             "id": c.id,
@@ -140,7 +155,7 @@ def list_chats(
             "is_pinned": c.is_pinned,
             "is_temporary": c.is_temporary,
             "project_id": c.project_id,
-            "message_count": len(c.messages),
+            "message_count": message_counts.get(c.id, 0),
             "updated_at": c.updated_at.isoformat(),
             "language": c.language
         }
@@ -336,14 +351,12 @@ def add_message_and_respond(
     )
     db.add(user_msg)
     
-    # Retrieve and generate answer
-    try:
-        from app.services.kb_retriever import retrieve_from_kb
+    # Evidence: the most relevant parts of an attached document, otherwise the knowledge base
+    if document_context:
+        documents = select_relevant_passages(document_context, question)
+    else:
         documents = retrieve_from_kb(optimized_question, top_k=5)
-    except ImportError as e:
-        print(f"KB retriever not available: {e}")
-        documents = []
-    
+
     if not documents:
         assistant_content = "Sorry, I could not find relevant information in my knowledge base."
         evidence = []
@@ -357,9 +370,8 @@ def add_message_and_respond(
                 depth=request.depth,
                 length=request.length,
                 diagnostic=request.diagnostic,
-                document_context=document_context  # Pass document context separately
             )
-            
+
             assistant_content = final_answer
             evidence = documents
             msg_meta = {
@@ -369,6 +381,8 @@ def add_message_and_respond(
                 "followups": followups,
                 "optimized_question": optimized_question
             }
+        except LimitExceeded:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
     
