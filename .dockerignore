@@ -1,0 +1,25 @@
+# Secrets and local state never go into the image
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
+
+# Only data/index is needed at runtime
+data/raw
+data/raw_pdfs
+data/clean
+
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.vscode
+.streamlit/secrets.toml
+tests
+eval
+scripts
+send_test_quiz.py
+test*.py

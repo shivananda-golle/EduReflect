@@ -199,6 +199,22 @@ The whole app runs as a single Streamlit process: with `EMBEDDED_BACKEND=true`, 
 
 Top-level secrets are exported as environment variables before the backend starts.
 
+### Hugging Face Spaces (Docker)
+
+The `Dockerfile` runs the same single-process setup on port 7860 with the embedding model baked in
+(~340 MB image, no downloads at cold start). The Space keeps its own README (with the Spaces YAML
+header) on the `hf-space` branch:
+
+```bash
+docker build -t edureflect . && docker run -p 7860:7860 --env-file .env edureflect   # locally
+
+git remote add space https://huggingface.co/spaces/<user>/edureflect                 # once
+git checkout hf-space && git merge main && git checkout --ours README.md && git commit -a --no-edit
+git push space hf-space:main
+```
+
+Set `GROQ_API_KEY`, `SECRET_KEY` and `DATABASE_URL` as Space secrets.
+
 ---
 
 ## Free-tier protection
