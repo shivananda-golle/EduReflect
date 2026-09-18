@@ -8,6 +8,8 @@ An AI-powered study assistant. EduReflect answers students' questions from a cur
 
 **Live demo:** **<https://edureflect.streamlit.app/>** (free tier: sign up to try it; 20 actions per user per day. If the app has been idle, click "wake up" and give it about a minute.)
 
+**Overview page:** <https://huggingface.co/spaces/shivananda15/edureflect> (Hugging Face Space, source in `hf-static/`)
+
 ---
 
 ## Features

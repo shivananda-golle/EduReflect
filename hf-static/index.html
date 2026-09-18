@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EduReflect — AI Study Assistant</title>
+<style>
+  :root {
+    --bg: #fbfbfd; --panel: #ffffff; --ink: #14161a; --muted: #5b6270;
+    --line: #e4e7ec; --accent: #3b5bdb; --accent-soft: #eef2ff; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #171a21; --ink: #f2f4f8; --muted: #a0a8b8;
+      --line: #262b36; --accent: #8ea2ff; --accent-soft: #1b2136; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 56px 0 32px; }
+  .eyebrow { color: var(--muted); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 10px; }
+  h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.15; margin: 0 0 14px; letter-spacing: -.02em; }
+  .lede { font-size: clamp(17px, 2.4vw, 19px); color: var(--muted); margin: 0 0 26px; max-width: 42em; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px;
+    text-decoration: none; font-weight: 600; border: 1px solid transparent; transition: transform .06s ease;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--panel); color: var(--ink); border-color: var(--line); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 34px 0 0; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+  .stat b { display: block; font-size: 22px; letter-spacing: -.01em; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  section { padding: 34px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 20px; margin: 0 0 16px; letter-spacing: -.01em; }
+  p { margin: 0 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  ol.flow { counter-reset: step; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  ol.flow li { display: flex; gap: 12px; align-items: flex-start; }
+  ol.flow li::before {
+    counter-increment: step; content: counter(step);
+    flex: 0 0 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; margin-top: 2px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  tr.best td { font-weight: 600; }
+  .demo { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+  .demo-frame { width: 100%; height: 640px; border: 0; display: block; background: var(--panel); }
+  .demo-cover { padding: 46px 22px; text-align: center; }
+  .demo-cover p { color: var(--muted); max-width: 34em; margin: 0 auto 18px; font-size: 14.5px; }
+  .note { color: var(--muted); font-size: 14px; }
+  code { background: var(--accent-soft); color: var(--accent); padding: 1px 6px; border-radius: 5px; font-size: 13.5px; }
+  footer { padding: 30px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+  footer a { color: var(--accent); }
+  @media (max-width: 640px) { .demo-frame { height: 520px; } header { padding-top: 36px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Retrieval-Augmented Generation · Portfolio project</p>
+    <h1>📘 EduReflect — AI study assistant</h1>
+    <p class="lede">
+      Ask questions about school science and maths and get answers grounded in a knowledge base of
+      2,316 passages, with every claim cited back to the passage it came from. Turn any answer into a
+      quiz, track what you've mastered, or upload your own PDF and ask questions about it.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://edureflect.streamlit.app/" target="_blank" rel="noopener">Open the live app →</a>
+      <a class="btn btn-secondary" href="https://github.com/shivananda-golle/EduReflect" target="_blank" rel="noopener">View the source</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>2,316</b><span>indexed passages</span></div>
+      <div class="stat"><b>97.3%</b><span>retrieval hit@5 (75-question benchmark)</span></div>
+      <div class="stat"><b>~1 s</b><span>per answer</span></div>
+      <div class="stat"><b>$0</b><span>to run, no credit card</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Try it here</h2>
+    <div class="demo">
+      <div class="demo-cover" id="cover">
+        <p>
+          The demo runs on a free tier and sleeps when unused. Loading it here takes a few seconds;
+          if it shows a "wake up" screen, click it and give it about a minute.
+        </p>
+        <button class="btn btn-primary" id="load-demo" type="button">Load the app in this page</button>
+      </div>
+    </div>
+    <p class="note" style="margin-top:10px">
+      Sign-up is free. Demo limits: 20 actions per person per day, 500 AI calls per day in total.
+    </p>
+  </section>
+
+  <section>
+    <h2>How an answer is produced</h2>
+    <ol class="flow">
+      <li><div><strong>Two searches run in parallel.</strong> Semantic search (bge-small embeddings + FAISS) finds passages that mean the same thing; BM25 keyword search catches exact terms like "Heron's formula" or "nichrome".</div></li>
+      <li><div><strong>The rankings are fused.</strong> Reciprocal rank fusion merges both lists and keeps the best 5 passages.</div></li>
+      <li><div><strong>The model answers from those passages only.</strong> One call, with the passages numbered, so it can cite <code>[1]</code>, <code>[2]</code> and say when the evidence doesn't cover the question.</div></li>
+      <li><div><strong>You see the evidence.</strong> The cited passages, a confidence rating, key terms and follow-up questions come back with the answer.</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>What it does</h2>
+    <div class="grid">
+      <div class="card"><h3>Cited answers</h3><p>Every answer points at the passages it used, with adjustable depth, length and format.</p></div>
+      <div class="card"><h3>Quizzes from any answer</h3><p>Five multiple-choice questions, scored, with per-concept mastery tracking.</p></div>
+      <div class="card"><h3>Your own documents</h3><p>Upload a PDF or DOCX; the relevant sections are found and cited, not just the first page.</p></div>
+      <div class="card"><h3>Study workspace</h3><p>Chats grouped in projects, search, editing, summaries and PDF export.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Retrieval benchmark</h2>
+    <p class="note">
+      75 questions generated from random passages; the test is whether search returns the passage each
+      question was written from. Hybrid is the default: the model reads all five passages, so top-5 coverage matters most.
+    </p>
+    <table>
+      <thead><tr><th>Mode</th><th>hit@1</th><th>hit@5</th><th>MRR@10</th><th>Latency</th></tr></thead>
+      <tbody>
+        <tr><td>Dense (bge-small)</td><td>73.3%</td><td>93.3%</td><td>0.823</td><td>~18 ms</td></tr>
+        <tr><td>BM25</td><td>82.7%</td><td>94.7%</td><td>0.884</td><td>~1 ms</td></tr>
+        <tr class="best"><td>Hybrid (default)</td><td>82.7%</td><td>97.3%</td><td>0.885</td><td>~21 ms</td></tr>
+        <tr><td>Hybrid + cross-encoder rerank</td><td>90.7%</td><td>98.7%</td><td>0.937</td><td>~1,100 ms</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Built with</h2>
+    <p class="note">
+      FastAPI · Streamlit · SQLAlchemy with Postgres · FAISS + fastembed (<code>BAAI/bge-small-en-v1.5</code>, ONNX,
+      no PyTorch, ~380 MB total) · Groq (<code>gpt-oss-20b</code> with automatic fallback) · pytest and GitHub Actions.
+      Daily budgets, per-user limits and sign-up throttling keep the public demo inside free quotas.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      Knowledge base: NCERT textbook excerpts (© NCERT, educational use) and Wikipedia (CC BY-SA 4.0).
+      A portfolio project, not a substitute for your textbook.
+    </p>
+    <p>
+      <a href="https://edureflect.streamlit.app/" target="_blank" rel="noopener">Live app</a> ·
+      <a href="https://github.com/shivananda-golle/EduReflect" target="_blank" rel="noopener">GitHub</a> ·
+      <a href="https://huggingface.co/spaces/shivananda15/eu-ai-act-graphrag" target="_blank" rel="noopener">EU AI Act GraphRAG (my other project)</a>
+    </p>
+  </footer>
+
+</div>
+<script>
+  document.getElementById("load-demo").addEventListener("click", function () {
+    var frame = document.createElement("iframe");
+    frame.className = "demo-frame";
+    frame.src = "https://edureflect.streamlit.app/?embed=true";
+    frame.title = "EduReflect live demo";
+    frame.loading = "lazy";
+    frame.allow = "clipboard-write";
+    document.getElementById("cover").replaceWith(frame);
+  });
+</script>
+</body>
+</html>
